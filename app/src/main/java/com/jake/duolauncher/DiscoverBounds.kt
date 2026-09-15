@@ -66,18 +66,15 @@ internal object DiscoverBounds {
                             val metrics = getMetrics.invoke(parent) as WindowMetrics
                             val configuration = getConfig.invoke(parent) as Configuration
                             val d = configuration.densityDpi / 160f
-                            val dock = dockWidth(context, metrics.bounds.width() / d)
                             val vertical = runCatching { JSONObject(context.getSharedPreferences("launcher", 0).getString("state", "{}") ?: "{}").optBoolean("verticalStatus", true) }.getOrDefault(true)
                             val types = WindowInsets.Type.displayCutout() or WindowInsets.Type.navigationBars() or
                                 (if (vertical) 0 else WindowInsets.Type.statusBars())
                             val insets = metrics.windowInsets.getInsetsIgnoringVisibility(types)
-                            // Outer glass starts at 16dp; Google's real viewport is inset another
-                            // 16dp. Its own native text padding remains completely unobscured.
-                            val left = (insets.left + 32*d).toInt().coerceIn(0, metrics.bounds.width()-1)
-                            val top = (insets.top + 32*d).toInt().coerceIn(0, metrics.bounds.height()-1)
+                            val left = insets.left.coerceIn(0, metrics.bounds.width()-1)
+                            val top = insets.top.coerceIn(0, metrics.bounds.height()-1)
                             Rect(left, top,
-                                (metrics.bounds.width() - insets.right - (dock + 44)*d).toInt().coerceAtLeast(left+1),
-                                (metrics.bounds.height() - insets.bottom - 32*d).toInt().coerceAtLeast(top+1))
+                                (metrics.bounds.width() - insets.right).coerceAtLeast(left+1),
+                                (metrics.bounds.height() - insets.bottom).coerceAtLeast(top+1))
                         }.getOrElse {
                             Log.w("DuoDiscover", "Padded bounds unavailable", it)
                             // Fail closed, leaving the launcher's back arrow accessible.

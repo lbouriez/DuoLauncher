@@ -114,7 +114,7 @@ internal class DiscoverFrame(private val activity: Activity, private val vertica
                 }
                 val insets = rootWindowInsets?.getInsets(WindowInsets.Type.systemBars())
                 clipPath.rewind()
-                if (DiscoverBounds.available) clipPath.addRoundRect(0f, 0f, width.toFloat(), height.toFloat(), 16*d, 16*d, Path.Direction.CW)
+                if (DiscoverBounds.available) clipPath.addRect(0f, 0f, width.toFloat(), height.toFloat(), Path.Direction.CW)
                 else clipPath.addRoundRect(2*d, (insets?.top ?: 0) + 12*d, width - 2*d,
                         height - (insets?.bottom ?: 0) - 12*d, 26*d, 26*d, Path.Direction.CW)
                 clipPath.offset(-(1f - DiscoverMotion.progress.floatValue) * width, 0f)

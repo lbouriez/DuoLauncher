@@ -83,6 +83,7 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.core.view.WindowInsetsCompat
 import androidx.compose.ui.viewinterop.AndroidView
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.distinctUntilChanged
@@ -384,11 +385,13 @@ fun LauncherScreen(
         LiveDiscover.homeLayer = homeLayer
         onDispose { if (LiveDiscover.homeLayer === homeLayer) LiveDiscover.homeLayer = null }
     }
+    var launcherBoundsInWindow by remember { mutableStateOf<androidx.compose.ui.geometry.Rect?>(null) }
     Box(Modifier.fillMaxSize().graphicsLayer {
         // The feed frame reuses the pager's render nodes in another window. Give Main
         // a complete render target so cross-window damage cannot erase stationary controls.
         compositingStrategy = androidx.compose.ui.graphics.CompositingStrategy.Offscreen
-    }.onSizeChanged { LiveDiscover.fullSize = androidx.compose.ui.geometry.Size(it.width.toFloat(), it.height.toFloat()) }.testTag("launcher-root").homeDragInput(drag,
+    }.onSizeChanged { LiveDiscover.fullSize = androidx.compose.ui.geometry.Size(it.width.toFloat(), it.height.toFloat()) }
+        .onGloballyPositioned { launcherBoundsInWindow = it.boundsInWindow() }.testTag("launcher-root").homeDragInput(drag,
         enabled = sheet.isEmpty() && !showFirstRun && selectedId == null && resizeSlot == null && pager.currentPage >= 0,
         page = pager.currentPage, eligiblePages = eligibleDragPages, onStart = {
             focus.clearFocus(); keyboard?.hide(); haptic.performHapticFeedback(HapticFeedbackType.LongPress)
@@ -494,10 +497,15 @@ fun LauncherScreen(
                     if (firstHome > 0) {
                         val bounds = it.boundsInWindow()
                         LiveDiscover.pagerOrigin = bounds.topLeft
-                        val padding = 32 * density.density
+                        val root = launcherBoundsInWindow ?: bounds
+                        val insets = androidx.core.view.ViewCompat.getRootWindowInsets(launcherRootView)
+                            ?.getInsets(WindowInsetsCompat.Type.systemBars() or WindowInsetsCompat.Type.displayCutout())
                         LiveDiscover.prepare(launcherActivity,
-                            android.graphics.Rect((bounds.left + padding).toInt(), (bounds.top + padding).toInt(),
-                                (bounds.right - 16 * density.density).toInt(), (bounds.bottom - padding).toInt()), bounds.width)
+                            android.graphics.Rect((root.left + (insets?.left ?: 0)).toInt(),
+                                (root.top + (insets?.top ?: 0)).toInt(),
+                                (root.right - (insets?.right ?: 0)).toInt(),
+                                (root.bottom - (insets?.bottom ?: 0)).toInt()),
+                            root.width)
                     }
                 }
                 .semantics { stateDescription = if (pager.currentPage == -1) "Discover" else if (pager.currentPage == visibleHomePages) "All apps" else "Home page ${pager.currentPage + 1} of $visibleHomePages" }

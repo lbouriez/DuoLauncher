@@ -24,6 +24,7 @@ import androidx.activity.viewModels
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.BorderStroke
+import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
@@ -94,14 +95,13 @@ internal object DiscoverEmbedding {
             .setMaxAspectRatioInLandscape(EmbeddingAspectRatio.ALWAYS_ALLOW)
             .setFinishSecondaryWithPrimary(SplitRule.FinishBehavior.ALWAYS)
             .setFinishPrimaryWithSecondary(SplitRule.FinishBehavior.ALWAYS)
-            .setDefaultSplitAttributes(attributes(.22f)).setClearTop(true).setTag("duo-discover").build())
+            .setDefaultSplitAttributes(attributes(.05f)).setClearTop(true).setTag("duo-discover").build())
         if (WindowSdkExtensions.getInstance().extensionVersion >= 2) {
           controller.setSplitAttributesCalculator { params ->
             if (params.splitRuleTag != "duo-discover") return@setSplitAttributesCalculator params.defaultSplitAttributes
-            val density = params.parentConfiguration.densityDpi / 160f
-            val widthDp = params.parentWindowMetrics.bounds.width() / density
-            val dockWidth = DiscoverBounds.dockWidth(context, widthDp)
-            attributes(discoverDockFraction(widthDp, dockWidth))
+            // Discover is immersive: retain only a minimal host strip for the paired-activity
+            // contract while giving the Google activity the remaining width.
+            attributes(.05f)
           }
         }
     }
@@ -185,16 +185,10 @@ class DiscoverActivity : DiscoverPageActivity() {
             }
           }
         }
-        val monitor = DeviceStatusMonitor(this).also { lifecycle.addObserver(it) }
-        val startupApps = DiscoverSession.apps
         setContent {
-            val state by model.state.collectAsStateWithLifecycle()
-            val status by monitor.state.collectAsStateWithLifecycle()
             DuoTheme(rememberSavedAppearance().dark) {
                 BackHandler { DiscoverSession.requestHome(this) }
-                DiscoverDock(if (state.loading) state.copy(apps = startupApps) else state, status, fullSize.value, onLaunch = ::launchApp,
-                    onHome = { DiscoverSession.requestHome(this) }, onSearch = { DiscoverSession.home(this, search = true) },
-                    onReady = { viewportReady = true; openFeed() })
+                DiscoverViewport(onReady = { viewportReady = true; openFeed() })
             }
         }
         if (!DiscoverBounds.available) window.decorView.post { viewportReady = true; openFeed() }
@@ -257,11 +251,8 @@ class DiscoverFeedActivity : DiscoverPageActivity() {
                 }
                 val progress = DiscoverMotion.progress.floatValue
                 Box(Modifier.fillMaxSize()) {
-                    if (!DiscoverBounds.available) DuneWallpaper()
-                    Surface(if (DiscoverBounds.available) Modifier.fillMaxSize()
-                        else Modifier.fillMaxSize().windowInsetsPadding(WindowInsets.safeDrawing).padding(12.dp),
-                        shape = RoundedCornerShape(if (DiscoverBounds.available) 16.dp else 26.dp),
-                        color = Glass, border = BorderStroke(1.dp, Color.White.copy(alpha = .4f))) {
+                    if (showMessage) Surface(Modifier.fillMaxSize(), color = Glass,
+                        border = BorderStroke(1.dp, Color.White.copy(alpha = .4f))) {
                         // Recovery is only shown while connecting or after a real error. A native
                         // swipe must never reveal the old loading controls behind a loaded feed.
                         if (showMessage) Column(Modifier.fillMaxSize().graphicsLayer {
@@ -338,91 +329,19 @@ class DiscoverFeedActivity : DiscoverPageActivity() {
 }
 
 @Composable
-private fun DiscoverDock(state: LauncherState, status: DeviceStatus, fullSize: Size,
-    onLaunch: (AppEntry) -> Unit, onHome: () -> Unit, onSearch: () -> Unit, onReady: () -> Unit) {
-    val density = LocalDensity.current
+private fun DiscoverViewport(onReady: () -> Unit) {
     val context = LocalContext.current
-    val fullWidth = fullSize.width / density.density
-    val preset = if (fullWidth >= 650f) state.expanded else state.compact
-    val apps = remember(state.apps) { state.apps.associateBy { it.id } }
     val progress = DiscoverMotion.progress.floatValue
-    val backgroundRevision = LauncherBackgroundCache.revision.intValue
-    val backgroundPhoto = remember(backgroundRevision) {
-        LauncherBackgroundCache.bitmap?.takeUnless { it.isRecycled }?.asImageBitmap()
-    }
-    DiscoverMotion.pageWidth = (fullWidth - preset.dockWidth - 28f) * density.density
-    Box(Modifier.fillMaxSize().testTag("discover-chrome").semantics { testTagsAsResourceId = true }) {
+    Box(Modifier.fillMaxSize().testTag("discover-chrome").semantics { testTagsAsResourceId = true }
+        .background(if (DuoAppearanceRuntime.dark) Color(0xFF263A43) else Color(0xFFE8EFF2))) {
+        Box(Modifier.fillMaxSize().windowInsetsPadding(WindowInsets.safeDrawing).onGloballyPositioned {
+            val bounds = it.boundsInWindow()
+            DiscoverBounds.updateViewport(context, android.graphics.Rect(
+                bounds.left.toInt(), bounds.top.toInt(), bounds.right.toInt(), bounds.bottom.toInt()))
+            onReady()
+        })
         Canvas(Modifier.fillMaxSize()) {
-            val offset = fullSize.width - size.width
-            translate(left = -offset) {
-                // Draw the same full-screen wallpaper coordinates in this narrow viewport.
-                val native = drawContext.canvas
-                val painter = androidx.compose.ui.graphics.drawscope.CanvasDrawScope()
-                painter.draw(density, layoutDirection, native, fullSize) {
-                    drawLauncherBackground(backgroundPhoto, DuoAppearanceRuntime.dark)
-                }
-            }
-        }
-        BoxWithConstraints(Modifier.fillMaxSize().windowInsetsPadding(WindowInsets.safeDrawing)) {
-            if (DiscoverBounds.available) Box(Modifier.fillMaxHeight().width((fullWidth - preset.dockWidth - 28).dp)
-                .padding(start = 16.dp, top = 16.dp, bottom = 16.dp).onGloballyPositioned {
-                    val outer = it.boundsInWindow()
-                    val padding = 16 * density.density
-                    DiscoverBounds.updateViewport(context, android.graphics.Rect(
-                        (outer.left + padding).toInt(), (outer.top + padding).toInt(),
-                        (outer.right - padding).toInt(), (outer.bottom - padding).toInt()))
-                    onReady()
-                }) {
-                Surface(Modifier.fillMaxSize().graphicsLayer { translationX = -(1f - progress) * DiscoverMotion.pageWidth },
-                    shape = RoundedCornerShape(30.dp), color = Glass.copy(alpha = .92f), border = BorderStroke(1.dp, Color.White.copy(alpha = .5f))) {}
-            }
-            Canvas(Modifier.fillMaxSize()) {
-                val insets = androidx.core.view.ViewCompat.getRootWindowInsets((context as Activity).window.decorView)
-                    ?.getInsets(WindowInsetsCompat.Type.systemBars() or WindowInsetsCompat.Type.displayCutout())
-                if (progress < 1f) DiscoverMotion.drawHome(drawContext.canvas.nativeCanvas,
-                    fullSize.width - size.width, (insets?.top ?: 0).toFloat(), fullSize.width, fullSize.height)
-            }
-            var statusHeight by remember { mutableFloatStateOf(0f) }
-            val geometry = homeGeometry(fullWidth, maxHeight.value, preset, state.labels,
-                statusHeight = if (state.verticalStatus) statusHeight + 22f else 0f,
-                labelHeight = with(density) { 14.sp.toDp().value } + 6f, inLibrary = true,
-                homeBottomSpace = if (context.getSystemService(android.app.role.RoleManager::class.java)
-                    .isRoleHeld(android.app.role.RoleManager.ROLE_HOME)) 44f else 88f)
-            val recents = visibleDockRecentIds(state, apps.keys).mapNotNull(apps::get)
-            val dockHeight = (geometry.dockHeight + if (recents.isEmpty()) 0f else 14f + geometry.dockRowHeight * recents.size)
-                .coerceAtMost((maxHeight.value - geometry.dockTop - 120f).coerceAtLeast(geometry.dockHeight))
-            if (state.verticalStatus) StatusRail(status, Modifier.align(Alignment.TopEnd).padding(end = 12.dp)
-                .offset(y = geometry.contentTop.dp).width(preset.dockWidth.dp)
-                .onSizeChanged {
-                    // The normal rail's 20dp location slot and 3dp gap do not move the dock.
-                    statusHeight = (it.height / density.density -
-                        if (maxHeight < 500.dp) 0f else 23f).coerceAtLeast(0f)
-                },
-                compact = maxHeight < 500.dp, iconSize = dockIconSize(geometry.iconSize).dp)
-            Surface(Modifier.align(Alignment.TopEnd).padding(end = 12.dp).offset(y = geometry.dockTop.dp)
-                .width(preset.dockWidth.dp).height(dockHeight.dp).testTag("discover-dock"),
-                shape = RoundedCornerShape(30.dp), color = Glass.copy(alpha = .32f), border = BorderStroke(1.dp, Color.White.copy(alpha = .3f))) {
-                Column(Modifier.padding(vertical = 8.dp).verticalScroll(rememberScrollState()), horizontalAlignment = Alignment.CenterHorizontally) {
-                    state.dock.forEachIndexed { index, id ->
-                        val app = apps[id]
-                        Box(Modifier.fillMaxWidth().height(geometry.dockRowHeight.dp).testTag("discover-dock-slot-$index")
-                            .semantics { contentDescription = app?.label ?: "Choose dock app on home" }
-                            .clickable(role = Role.Button) { if (app != null) onLaunch(app) else onHome() }, contentAlignment = Alignment.Center) {
-                            if (app != null) Image(app.icon.asImageBitmap(), null,
-                                Modifier.size(dockIconSize(geometry.iconSize).dp).clip(RoundedCornerShape(11.dp)))
-                            else Icon(Icons.Rounded.Home, null, tint = Color.White)
-                        }
-                    }
-                    DockRecents(recents, geometry.dockRowHeight, dockIconSize(geometry.iconSize),
-                        onLaunch = { app, _ -> onLaunch(app) }, onActions = {})
-                }
-            }
-            Column(Modifier.align(Alignment.BottomEnd).padding(end = 12.dp, bottom = 12.dp).width(preset.dockWidth.dp), horizontalAlignment = Alignment.CenterHorizontally) {
-                // Home is physically to the right of Discover, matching our fixed page order.
-                FilledTonalIconButton(onClick = onHome, Modifier.testTag("discover-home")) { Icon(Icons.Rounded.ArrowForward, "Back to home") }
-                Spacer(Modifier.height(8.dp))
-                FilledTonalIconButton(onClick = onSearch) { Icon(Icons.Rounded.Search, "Search apps") }
-            }
+            if (progress < 1f) DiscoverMotion.drawHome(drawContext.canvas.nativeCanvas, 0f, 0f, size.width, size.height)
         }
     }
 }
