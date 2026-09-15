@@ -13,6 +13,7 @@ import androidx.activity.enableEdgeToEdge
 import androidx.compose.runtime.mutableStateOf
 import androidx.core.view.WindowCompat
 import androidx.core.view.WindowInsetsCompat
+import androidx.core.view.WindowInsetsControllerCompat
 import androidx.window.embedding.ActivityEmbeddingController
 import java.lang.ref.WeakReference
 
@@ -250,7 +251,15 @@ class LiveDiscoverActivity : ComponentActivity() {
         frame = DiscoverFrame(this, vertical, live = true)
         client = DiscoverClient(this, vertical,
             onState = { LiveDiscover.message.value = it; if (it != null) frame.hide() },
-            onVisible = frame::reveal,
+            onVisible = {
+                frame.reveal()
+                // Do this only after the embedded Google surface is confirmed healthy. Changing
+                // system-bar visibility before the embedding handshake can invalidate its bounds.
+                WindowCompat.getInsetsController(window, window.decorView).apply {
+                    systemBarsBehavior = WindowInsetsControllerCompat.BEHAVIOR_SHOW_TRANSIENT_BARS_BY_SWIPE
+                    hide(WindowInsetsCompat.Type.systemBars())
+                }
+            },
             onProgress = { if (LiveDiscover.native(it)) frame.liveProgress = it else frame.invalidate() },
             onClosed = {}, pagerDriven = true)
         window.decorView.post { connect() }
