@@ -229,6 +229,14 @@ fun LauncherScreen(
             }
     }
     val scope = rememberCoroutineScope()
+    val liveDiscoverShowing by remember(nativePager, firstHome) {
+        derivedStateOf(structuralEqualityPolicy()) {
+            // Keep recovery controls available until Google's embedded feed confirms that it
+            // is visible. Once it owns the leading page, its UI must not compete with Duo's dock.
+            firstHome > 0 && LiveDiscover.message.value == null &&
+                nativePager.currentPage + nativePager.currentPageOffsetFraction <= firstHome + .25f
+        }
+    }
     DisposableEffect(pager) {
         val callback = { scope.launch { pager.animateScrollToPage(0) }; Unit }
         LiveDiscover.onHomeRequest = callback
@@ -608,7 +616,7 @@ fun LauncherScreen(
                     }
                 }
             }
-            if (!inLibrary && !drag.active) Column(Modifier.align(Alignment.BottomEnd).padding(end = 12.dp, bottom = 6.dp)
+            if (!inLibrary && !drag.active && !liveDiscoverShowing) Column(Modifier.align(Alignment.BottomEnd).padding(end = 12.dp, bottom = 6.dp)
                 .width(preset.dockWidth.dp), horizontalAlignment = Alignment.CenterHorizontally,
                 verticalArrangement = Arrangement.spacedBy(8.dp)) {
                 val controlSize = dockIconSize(geometry.iconSize).dp
