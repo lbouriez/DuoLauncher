@@ -496,11 +496,15 @@ fun LauncherScreen(
                 .onGloballyPositioned {
                     if (firstHome > 0) {
                         val bounds = it.boundsInWindow()
-                        val root = launcherBoundsInWindow ?: bounds
                         LiveDiscover.pagerOrigin = bounds.topLeft
+                        val root = launcherBoundsInWindow ?: bounds
+                        val insets = androidx.core.view.ViewCompat.getRootWindowInsets(launcherRootView)
+                            ?.getInsets(WindowInsetsCompat.Type.systemBars() or WindowInsetsCompat.Type.displayCutout())
                         LiveDiscover.prepare(launcherActivity,
-                            android.graphics.Rect(root.left.toInt(), root.top.toInt(),
-                                root.right.toInt(), root.bottom.toInt()),
+                            android.graphics.Rect((root.left + (insets?.left ?: 0)).toInt(),
+                                (root.top + (insets?.top ?: 0)).toInt(),
+                                (root.right - (insets?.right ?: 0)).toInt(),
+                                (root.bottom - (insets?.bottom ?: 0)).toInt()),
                             root.width)
                     }
                 }
