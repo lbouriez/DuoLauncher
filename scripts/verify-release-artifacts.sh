@@ -65,10 +65,11 @@ printf '%s\n' "$apk_certificate_output" | grep -q 'Verified using v[1-4] scheme'
     echo "APK signature verification did not report a verified signing scheme." >&2
     exit 1
 }
-# apksigner has varied its leading whitespace across build-tools releases.  Extract
-# the digest field rather than relying on the line starting in column one.
+# apksigner's certificate-label formatting varies across build-tools releases.
+# Its certificate SHA-256 value is the only 64-hex fingerprint in this output.
 apk_fingerprint=$(printf '%s\n' "$apk_certificate_output" \
-    | awk '/Signer #1 certificate SHA-256 digest:/ { print $NF; exit }' | normalize_fingerprint)
+    | grep -Eo '([[:xdigit:]]{2}:){31}[[:xdigit:]]{2}|[[:xdigit:]]{64}' \
+    | head -n 1 | normalize_fingerprint)
 [[ "$apk_fingerprint" == "$expected_fingerprint" ]] || {
     echo "APK signer does not match the configured signing certificate." >&2
     echo "Expected certificate SHA-256: $expected_fingerprint" >&2
