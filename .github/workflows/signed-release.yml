@@ -10,7 +10,7 @@ on:
       create_draft_release:
         description: Create an unpublished GitHub draft release after verification.
         required: true
-        default: false
+        default: true
         type: boolean
 
 permissions:
@@ -240,6 +240,48 @@ jobs:
         with:
           name: ${{ needs.sign_and_package.outputs.artifact_name }}
           path: release-assets
+      - name: Write draft notes with merged pull requests since the prior fork release
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+          DUO_SOURCE_COMMIT: ${{ needs.sign_and_package.outputs.source_commit }}
+          DUO_VERSION_NAME: ${{ needs.sign_and_package.outputs.version_name }}
+          DUO_VERSION_CODE: ${{ needs.sign_and_package.outputs.version_code }}
+          DUO_DEFAULT_BRANCH: ${{ github.event.repository.default_branch }}
+        run: |
+          set -euo pipefail
+          notes="$RUNNER_TEMP/duo-release-notes.md"
+          releases="$RUNNER_TEMP/duo-fork-releases.json"
+          gh api "repos/$GITHUB_REPOSITORY/releases?per_page=100" > "$releases"
+          previous_tag=$(jq -r '[.[] | select(.tag_name | startswith("duolauncher-fork-v"))] | sort_by(.created_at) | last | .tag_name // empty' "$releases")
+          previous_target=$(jq -r '[.[] | select(.tag_name | startswith("duolauncher-fork-v"))] | sort_by(.created_at) | last | .target_commitish // empty' "$releases")
+          {
+            printf '# DuoLauncher fork %s (%s)\n\n' "$DUO_VERSION_NAME" "$DUO_VERSION_CODE"
+            printf 'Verified signed fork build for commit `%s`. This is a draft and is not published automatically.\n\n' "$DUO_SOURCE_COMMIT"
+            if [[ -z "$previous_tag" || -z "$previous_target" ]]; then
+              echo '## Changes'
+              echo
+              echo 'Initial automated fork release; there is no earlier fork release to compare.'
+              exit 0
+            fi
+            previous_commit=$(gh api "repos/$GITHUB_REPOSITORY/commits/$previous_target" --jq .sha)
+            compare="$RUNNER_TEMP/duo-release-compare.json"
+            gh api "repos/$GITHUB_REPOSITORY/compare/$previous_commit...$DUO_SOURCE_COMMIT" > "$compare"
+            echo "## Changes since $previous_tag"
+            echo
+            declare -A seen_prs=()
+            while IFS= read -r commit; do
+              while IFS=$'\t' read -r number title url; do
+                [[ -n "$number" && -z ${seen_prs[$number]+x} ]] || continue
+                seen_prs[$number]=1
+                printf -- '- [#%s](%s) %s\n' "$number" "$url" "$title"
+              done < <(gh api "repos/$GITHUB_REPOSITORY/commits/$commit/pulls" | \
+                jq -r --arg branch "$DUO_DEFAULT_BRANCH" '.[] | select(.merged_at != null and .base.ref == $branch) | [.number, .title, .html_url] | @tsv')
+            done < <(jq -r '.commits[].sha' "$compare")
+            if (( ${#seen_prs[@]} == 0 )); then
+              echo 'No merged pull requests were associated with the commits in this range.'
+            fi
+          } > "$notes"
       - name: Refuse existing tag or release, then create an unpublished draft
         shell: bash
         env:
@@ -260,5 +302,5 @@ jobs:
           fi
           gh release create "$DUO_RELEASE_TAG" --repo "$GITHUB_REPOSITORY" --target "$DUO_SOURCE_COMMIT" --draft \
             --title "DuoLauncher fork $DUO_VERSION_NAME ($DUO_VERSION_CODE)" \
-            --notes "Verified signed fork build for commit $DUO_SOURCE_COMMIT. This is a draft and is not published automatically." \
+            --notes-file "$RUNNER_TEMP/duo-release-notes.md" \
             release-assets/*

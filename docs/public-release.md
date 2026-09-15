@@ -80,7 +80,7 @@ The workflow decodes the keystore only under `RUNNER_TEMP`, outside both the che
 2. Open **Actions → Build signed release → Run workflow**. GitHub must show your fork's default branch; the workflow refuses any other ref.
 3. The workflow automatically generates `versionCode` from the exact commit's full Git-history count plus the checked-in fork offset. The offset is based on the last signed fork build (code 31), so the next new commit receives a higher code. It never uses a clock or GitHub run number. Re-running the exact same commit deliberately produces the same version code; distribute a newer main commit for an Android update.
 4. Optionally enter a safe `version_name` (letters, digits, `.`, `_`, and `-`, maximum 64 characters). Leave it blank to use the project value. The override is passed to Gradle as an environment value; the workflow does not edit or commit source files.
-5. Leave **create draft release** off for the normal artifact-only flow. Run the workflow.
+5. **Create draft release** is selected by default. Keep it selected to create an unpublished GitHub draft after verification, with notes listing merged pull requests since the preceding fork release. Clear it only when you specifically want artifacts without a draft. Run the workflow.
 6. In the successful run's **Artifacts** section, download the signed-build artifact. Install the `.apk` on the phone. Keep the `.aab` for a future Play Console submission. `BUILD-METADATA.txt` and `SHA256SUMS.txt` identify exactly what was built; the separate R8 mapping artifact is for diagnostics.
 
 The workflow uses Android `apksigner` for the APK and confirms package ID, version code/name, release debuggability, test-only status, and configured certificate fingerprint. It uses Java `jarsigner`/`keytool` for the AAB because `apksigner` does not verify Android App Bundles. A normal warning about a valid self-signed owner certificate is not the same thing as an unsigned or invalid bundle.
@@ -100,13 +100,13 @@ Before first Play submission, settle the permanent application ID, signing-key b
 
 ## Optional draft GitHub release
 
-Set **create draft release** to true only when you want GitHub to create an unpublished draft after every check and package verification succeeds. The signing job retains read-only token access. A separate publishing job receives only `contents: write`, downloads the verified artifact, and creates a draft with the tag format:
+**Create draft release** is selected by default, so GitHub normally creates an unpublished draft after every check and package verification succeeds. The signing job retains read-only token access. A separate publishing job receives only `contents: write`, downloads the verified artifact, and creates a draft with the tag format:
 
 ```text
 duolauncher-fork-v<versionName>-<versionCode>
 ```
 
-It refuses to overwrite an existing tag or release. The draft is not published automatically. This fork-specific prefix avoids collisions with inherited upstream tags.
+It refuses to overwrite an existing tag or release. The draft is not published automatically. Its notes list the merged pull requests associated with commits since the prior fork release; the first such release records that there is no prior fork release for comparison. This fork-specific prefix avoids collisions with inherited upstream tags.
 
 ## Local signed build and public-source export
 
