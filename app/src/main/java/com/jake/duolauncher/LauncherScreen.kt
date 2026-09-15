@@ -1809,48 +1809,6 @@ private fun MovableWidget(id: Int, slot: Int, controller: WidgetController, drag
 }
 
 @Composable
-internal fun AppPicker(apps: List<AppEntry>, dockSlot: Int?, onSelect: (AppEntry) -> Unit, onClear: () -> Unit,
-    onLongClick: (AppEntry) -> Unit, canSelect: (AppEntry) -> Boolean = { true }, blockedHint: String? = null,
-    heightFraction: Float = .88f, requestSearchFocus: Boolean = false) {
-    var query by rememberSaveable { mutableStateOf("") }
-    val searchFocus = remember { FocusRequester() }
-    val keyboard = LocalSoftwareKeyboardController.current
-    LaunchedEffect(requestSearchFocus) {
-        if (requestSearchFocus) {
-            // Let the sheet attach before binding the IME to its editor.
-            delay(300)
-            searchFocus.requestFocus()
-            keyboard?.show()
-        }
-    }
-    val filtered = remember(apps, query) { apps.filter { it.label.contains(query.trim(), ignoreCase = true) } }
-    Column(Modifier.fillMaxWidth().fillMaxHeight(heightFraction).padding(horizontal = 20.dp).imePadding()) {
-        Text(if (dockSlot == null) "Your apps" else "Dock position ${dockSlot + 1}", style = MaterialTheme.typography.headlineSmall)
-        OutlinedTextField(query, { query = it }, Modifier.fillMaxWidth().padding(vertical = 16.dp)
-            .focusRequester(searchFocus).testTag("search-field"),
-            placeholder = { Text("Search apps") }, leadingIcon = { Icon(Icons.Rounded.Search, null) }, singleLine = true,
-            trailingIcon = { if (query.isNotEmpty()) IconButton(onClick = { query = "" }) { Icon(Icons.Rounded.Close, "Clear search") } }, shape = RoundedCornerShape(20.dp))
-        if (dockSlot != null) TextButton(onClick = onClear) { Text("Leave this position empty") }
-        if (blockedHint != null) Text(blockedHint, color = MaterialTheme.colorScheme.error,
-            style = MaterialTheme.typography.bodyMedium, modifier = Modifier.padding(bottom = 8.dp).testTag("dock-full-guidance"))
-        LazyColumn(Modifier.weight(1f)) {
-            if (filtered.isEmpty()) item { Text("No apps found", Modifier.padding(vertical = 24.dp)) }
-            items(filtered, key = { it.id }) { app ->
-                val enabled = canSelect(app)
-                Row(Modifier.fillMaxWidth().testTag("picker-app-${app.id}")
-                    .combinedClickable(enabled = enabled, onClick = { onSelect(app) }, onLongClick = { onLongClick(app) })
-                    .alpha(if (enabled) 1f else .45f)
-                    .padding(vertical = 10.dp), verticalAlignment = Alignment.CenterVertically) {
-                    Image(app.icon.asImageBitmap(), null, Modifier.size(44.dp).clip(RoundedCornerShape(12.dp)))
-                    Text(app.label, Modifier.padding(start = 16.dp).weight(1f), maxLines = 2)
-                    if (dockSlot != null && enabled) Icon(Icons.Rounded.Add, "Choose ${app.label}")
-                }
-            }
-        }
-    }
-}
-
-@Composable
 private fun SettingsPanel(state: LauncherState, initiallyWide: Boolean, model: LauncherModel, isDefaultHome: Boolean,
     onMakeDefault: () -> Unit, onClose: () -> Unit, onEditPins: () -> Unit, onWidget: (Int) -> Unit,
     onAddWidget: (Int) -> Unit, onRemoveWidget: (Int) -> Unit, onWallpaperPreview: () -> Unit,
