@@ -24,6 +24,7 @@ scripts/export-public-source.sh
 scripts/check-public-source.sh
 scripts/release-signed.sh
 scripts/create-release-keystore.ps1
+scripts/generate-release-version.sh
 scripts/validate-release-config.sh
 scripts/verify-release-artifacts.sh
 .github/workflows/ci.yml

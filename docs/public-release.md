@@ -78,14 +78,16 @@ The workflow decodes the keystore only under `RUNNER_TEMP`, outside both the che
 
 1. Push the pipeline change and wait for **Android CI**. Its debug artifact is useful for development but is not the release APK.
 2. Open **Actions → Build signed release → Run workflow**. GitHub must show your fork's default branch; the workflow refuses any other ref.
-3. Enter a positive `version_code` between 1 and 2,100,000,000. For the first fork build, choose a value you can increase later. GitHub and this repository cannot tell you the highest code you previously uploaded to Play, so verify that yourself before a Play upload.
-4. Optionally enter a safe `version_name` (letters, digits, `.`, `_`, and `-`, maximum 64 characters). Leave it blank to use the project value. These overrides are passed to Gradle as environment values; the workflow does not edit or commit source files.
+3. The workflow automatically generates `versionCode` from the exact commit's full Git-history count plus the checked-in fork offset. The offset is based on the last signed fork build (code 31), so the next new commit receives a higher code. It never uses a clock or GitHub run number. Re-running the exact same commit deliberately produces the same version code; distribute a newer main commit for an Android update.
+4. Optionally enter a safe `version_name` (letters, digits, `.`, `_`, and `-`, maximum 64 characters). Leave it blank to use the project value. The override is passed to Gradle as an environment value; the workflow does not edit or commit source files.
 5. Leave **create draft release** off for the normal artifact-only flow. Run the workflow.
 6. In the successful run's **Artifacts** section, download the signed-build artifact. Install the `.apk` on the phone. Keep the `.aab` for a future Play Console submission. `BUILD-METADATA.txt` and `SHA256SUMS.txt` identify exactly what was built; the separate R8 mapping artifact is for diagnostics.
 
 The workflow uses Android `apksigner` for the APK and confirms package ID, version code/name, release debuggability, test-only status, and configured certificate fingerprint. It uses Java `jarsigner`/`keytool` for the AAB because `apksigner` does not verify Android App Bundles. A normal warning about a valid self-signed owner certificate is not the same thing as an unsigned or invalid bundle.
 
-To update the APK installation later, keep the same `DUO_APPLICATION_ID`, same keystore/alias, and use a strictly higher `version_code`. Android then preserves the launcher data while replacing the old version. A lower code reports a version-downgrade failure; a different signing certificate reports a signature mismatch. Uninstalling first loses launcher data, so do not use it as an update workaround unless that loss is acceptable.
+To update the APK installation later, keep the same `DUO_APPLICATION_ID` and keystore/alias, and build from a newer main commit. The automatic version code will then be higher and Android preserves launcher data while replacing the old version. A lower code reports a version-downgrade failure; a different signing certificate reports a signature mismatch. Uninstalling first loses launcher data, so do not use it as an update workaround unless that loss is acceptable.
+
+The automatic scheme assumes every distributed fork build uses this pipeline. If you ever distribute an APK/AAB with a manually chosen code higher than the generated sequence, raise `VERSION_CODE_OFFSET` in `scripts/generate-release-version.sh` before the next pipeline release. Never lower that offset.
 
 ## APK, AAB, signing, and Play
 
@@ -116,7 +118,6 @@ export DUO_RELEASE_STORE_FILE=/absolute/path/outside/the/repository/duolauncher-
 export DUO_RELEASE_STORE_PASSWORD='set privately in your shell'
 export DUO_RELEASE_KEY_ALIAS='your-key-alias'
 export DUO_RELEASE_KEY_PASSWORD='set privately in your shell'
-export DUO_VERSION_CODE=101
 # Optional: export DUO_VERSION_NAME='0.16.0'
 ./scripts/release-signed.sh
 ```

@@ -22,6 +22,15 @@ case "$store_file" in
         ;;
 esac
 
+source_commit=${DUO_SOURCE_COMMIT:-$(git -C "$repository_root" rev-parse HEAD)}
+if ! git -C "$repository_root" rev-parse --verify --quiet "$source_commit^{commit}" >/dev/null; then
+    echo "DUO_SOURCE_COMMIT must identify a commit in this checkout." >&2
+    exit 1
+fi
+if [[ -z ${DUO_VERSION_CODE:-} ]]; then
+    export DUO_VERSION_CODE=$("$repository_root/scripts/generate-release-version.sh" "$source_commit")
+fi
+
 metadata=$("$repository_root/scripts/gradle.sh" --quiet :app:printReleaseMetadata)
 application_id=$(sed -n 's/^applicationId=//p' <<< "$metadata")
 version_code=$(sed -n 's/^versionCode=//p' <<< "$metadata")
@@ -30,15 +39,9 @@ version_name=$(sed -n 's/^versionName=//p' <<< "$metadata")
     echo "Could not read effective release metadata from Gradle." >&2
     exit 1
 }
-export DUO_VERSION_CODE=${DUO_VERSION_CODE:-$version_code}
 export DUO_VERSION_NAME=${DUO_VERSION_NAME:-$version_name}
 "$repository_root/scripts/validate-release-config.sh" --require-fork-id
 
-source_commit=${DUO_SOURCE_COMMIT:-$(git -C "$repository_root" rev-parse HEAD)}
-if ! git -C "$repository_root" rev-parse --verify --quiet "$source_commit^{commit}" >/dev/null; then
-    echo "DUO_SOURCE_COMMIT must identify a commit in this checkout." >&2
-    exit 1
-fi
 build_label=${DUO_BUILD_LABEL:-local}
 if [[ ! "$build_label" =~ ^[0-9A-Za-z][0-9A-Za-z._-]{0,63}$ ]]; then
     echo "DUO_BUILD_LABEL may use only letters, numbers, dots, underscores, or hyphens." >&2

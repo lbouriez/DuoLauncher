@@ -7,10 +7,6 @@ on:
         description: Optional safe versionName override; leave empty to use the configured project value.
         required: false
         type: string
-      version_code:
-        description: Required Android versionCode (1 through 2100000000; must exceed every distributed update).
-        required: true
-        type: string
       create_draft_release:
         description: Create an unpublished GitHub draft release after verification.
         required: true
@@ -41,7 +37,8 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           ref: ${{ github.sha }}
-          fetch-depth: 1
+          # The automatic Android versionCode is derived from this exact commit's full history.
+          fetch-depth: 0
       - uses: gradle/actions/wrapper-validation@748248ddd2a24f49513d8f472f81c3a07d4d50e1 # v4.4.4
       - uses: actions/setup-java@de7274f081f381c8f8158605e0321c36c376e2e6 # v6.0.1
         with:
@@ -58,11 +55,15 @@ jobs:
           commit=$(git rev-parse HEAD)
           [[ "$commit" == "$GITHUB_SHA" ]] || { echo "Checkout did not resolve to the workflow commit." >&2; exit 1; }
           echo "commit=$commit" >> "$GITHUB_OUTPUT"
+      - name: Generate automatic Android version code
+        id: version
+        shell: bash
+        run: ./scripts/generate-release-version.sh "$GITHUB_SHA"
       - name: Validate release inputs and fork identity
         shell: bash
         env:
           DUO_APPLICATION_ID: ${{ vars.DUO_APPLICATION_ID }}
-          DUO_VERSION_CODE: ${{ inputs.version_code }}
+          DUO_VERSION_CODE: ${{ steps.version.outputs.version_code }}
           DUO_VERSION_NAME: ${{ inputs.version_name }}
         run: ./scripts/validate-release-config.sh --require-fork-id
       - name: Validate required signing configuration
@@ -89,7 +90,7 @@ jobs:
         shell: bash
         env:
           DUO_APPLICATION_ID: ${{ vars.DUO_APPLICATION_ID }}
-          DUO_VERSION_CODE: ${{ inputs.version_code }}
+          DUO_VERSION_CODE: ${{ steps.version.outputs.version_code }}
           DUO_VERSION_NAME: ${{ inputs.version_name }}
         run: |
           set -euo pipefail
@@ -130,7 +131,7 @@ jobs:
         shell: bash
         env:
           DUO_APPLICATION_ID: ${{ vars.DUO_APPLICATION_ID }}
-          DUO_VERSION_CODE: ${{ inputs.version_code }}
+          DUO_VERSION_CODE: ${{ steps.version.outputs.version_code }}
           DUO_VERSION_NAME: ${{ inputs.version_name }}
           DUO_RELEASE_STORE_PASSWORD: ${{ secrets.DUO_RELEASE_STORE_PASSWORD }}
           DUO_RELEASE_KEY_ALIAS: ${{ secrets.DUO_RELEASE_KEY_ALIAS }}
