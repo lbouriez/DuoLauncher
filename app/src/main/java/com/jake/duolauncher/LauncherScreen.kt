@@ -467,7 +467,10 @@ fun LauncherScreen(
                         .coerceIn(0f, 1f)
                 }
             }
-            val discoverDockTranslation = with(density) { discoverTransition * pagerWidth.toPx() }
+            // Live Discover hands off across the full launcher viewport, not the narrower
+            // pager region. The dock must cover that same distance or the home surface slides
+            // beneath it during the transition.
+            val discoverDockTranslation = with(density) { discoverTransition * maxWidth.toPx() }
             var gestureOriginInRoot by remember { mutableStateOf(Offset.Zero) }
             var gestureOriginInWindow by remember { mutableStateOf(Offset.Zero) }
             val pagerInputEnabled = pager.currentPage in -firstHome..visibleHomePages && !drag.active &&
