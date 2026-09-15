@@ -35,7 +35,7 @@ import androidx.compose.ui.unit.Density
 import androidx.compose.ui.unit.LayoutDirection
 
 @Composable
-internal fun DuneWallpaper(modifier: Modifier = Modifier.fillMaxSize()) {
+internal fun DuneWallpaper(modifier: Modifier = Modifier.fillMaxSize(), showDunesFallback: Boolean = false) {
     val palette = LocalDuoPalette.current
     val context = LocalContext.current.applicationContext
     val revision = LauncherBackgroundCache.revision.intValue
@@ -43,12 +43,14 @@ internal fun DuneWallpaper(modifier: Modifier = Modifier.fillMaxSize()) {
     val photo = produceState(initialValue = initial, key1 = context, key2 = revision) {
         value = withContext(Dispatchers.IO) { loadLauncherBackground(context) }
     }.value
-    Canvas(modifier) { drawLauncherBackground(photo?.asImageBitmap(), palette.dark) }
+    if (photo != null || showDunesFallback) Canvas(modifier) {
+        drawLauncherBackground(photo?.asImageBitmap(), palette.dark, showDunesFallback)
+    }
 }
 
-internal fun DrawScope.drawLauncherBackground(photo: ImageBitmap?, dark: Boolean = false) {
+internal fun DrawScope.drawLauncherBackground(photo: ImageBitmap?, dark: Boolean = false, showDunesFallback: Boolean = false) {
     if (photo == null || photo.width <= 0 || photo.height <= 0) {
-        drawDunes(dark)
+        if (showDunesFallback) drawDunes(dark)
         return
     }
     val destinationWidth = size.width.toInt().coerceAtLeast(1)
@@ -196,7 +198,7 @@ class DuneWallpaperService : WallpaperService() {
             try {
                 painter.draw(Density(resources.displayMetrics.density), LayoutDirection.Ltr,
                     androidx.compose.ui.graphics.Canvas(canvas), Size(canvas.width.toFloat(), canvas.height.toFloat())) {
-                        drawLauncherBackground(photo, appearance.state.dark)
+                        drawLauncherBackground(photo, appearance.state.dark, showDunesFallback = true)
                     }
             } finally { holder.unlockCanvasAndPost(canvas) }
         }

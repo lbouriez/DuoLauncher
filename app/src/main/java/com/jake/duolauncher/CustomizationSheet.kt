@@ -103,10 +103,10 @@ internal fun CustomizationSheet(state: LauncherState, initiallyWide: Boolean, mo
                     }
                     HorizontalDivider(Modifier.padding(vertical = 6.dp))
                     Text("Android wallpaper", style = MaterialTheme.typography.titleMedium)
-                    Text("Opens Android’s preview to change the phone wallpaper. It does not change Duo’s launcher background.",
+                    Text("Choose a phone wallpaper or a live wallpaper from Android and installed providers. It appears behind Duo whenever you have not selected a Duo photo.",
                         style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                     OutlinedButton(onClick = onWallpaperPreview, modifier = Modifier.fillMaxWidth().heightIn(min = 48.dp)
-                        .testTag("wallpaper-preview")) { Icon(Icons.Rounded.Wallpaper, null); Spacer(Modifier.width(8.dp)); Text("Preview Android wallpaper") }
+                        .testTag("wallpaper-preview")) { Icon(Icons.Rounded.Wallpaper, null); Spacer(Modifier.width(8.dp)); Text("Choose Android wallpaper") }
                     HorizontalDivider(Modifier.padding(vertical = 6.dp))
                     AppearanceSettings(appearance, onAppearanceMode, onAppearanceManual, onAppearanceDeviceLocation, onAppearanceClear)
                 }

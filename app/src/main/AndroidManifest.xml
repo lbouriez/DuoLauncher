@@ -10,6 +10,8 @@
             <action android:name="android.intent.action.MAIN" />
             <category android:name="android.intent.category.LAUNCHER" />
         </intent>
+        <intent><action android:name="android.intent.action.SET_WALLPAPER" /></intent>
+        <intent><action android:name="android.service.wallpaper.WallpaperService" /></intent>
         <intent><action android:name="org.adw.launcher.THEMES" /></intent>
         <intent><action android:name="com.gau.go.launcherex.theme" /></intent>
         <intent><action android:name="com.novalauncher.THEME" /></intent>

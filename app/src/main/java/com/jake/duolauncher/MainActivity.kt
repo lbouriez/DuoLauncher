@@ -79,6 +79,7 @@ class MainActivity : ComponentActivity() {
         val restoreShadeDialog = savedInstanceState?.getBoolean(SHADE_DIALOG_VISIBLE) == true
         appearance = AppearanceStore(this)
         window.preferHighRefreshRate()
+        window.addFlags(android.view.WindowManager.LayoutParams.FLAG_SHOW_WALLPAPER)
         enableEdgeToEdge(statusBarStyle = SystemBarStyle.dark(android.graphics.Color.TRANSPARENT),
             navigationBarStyle = SystemBarStyle.dark(android.graphics.Color.TRANSPARENT))
         widgets = WidgetController(this, model) { active ->
@@ -459,10 +460,10 @@ class MainActivity : ComponentActivity() {
 
     private fun previewWallpaper() {
         try {
-            startActivity(Intent(WallpaperManager.ACTION_CHANGE_LIVE_WALLPAPER)
-                .putExtra(WallpaperManager.EXTRA_LIVE_WALLPAPER_COMPONENT, ComponentName(this, DuneWallpaperService::class.java)))
-        } catch (_: android.content.ActivityNotFoundException) {
-            Toast.makeText(this, "The system wallpaper preview is unavailable.", Toast.LENGTH_LONG).show()
+            startActivity(Intent.createChooser(Intent(Intent.ACTION_SET_WALLPAPER), "Choose wallpaper"))
+        } catch (_: Exception) {
+            try { startActivity(Intent(WallpaperManager.ACTION_LIVE_WALLPAPER_CHOOSER)) }
+            catch (_: Exception) { Toast.makeText(this, "The system wallpaper picker is unavailable.", Toast.LENGTH_LONG).show() }
         }
     }
 
