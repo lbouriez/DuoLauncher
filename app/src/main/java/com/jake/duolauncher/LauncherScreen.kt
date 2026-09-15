@@ -110,6 +110,7 @@ fun LauncherScreen(
     state: LauncherState, model: LauncherModel, widgets: WidgetController, homeRequests: Int,
     onLaunch: (AppEntry) -> Unit, onMakeDefault: () -> Unit, onAppInfo: (AppEntry) -> Unit,
     isDefaultHome: Boolean, deviceStatus: DeviceStatus, onStatusMode: (Boolean) -> Unit, onWallpaperPreview: () -> Unit,
+    onFullscreenMode: (Boolean) -> Unit = {},
     onDiscover: () -> Unit = {}, searchRequests: Int = 0,
     onChooseDock: (Int) -> Unit = {},
     onLaunchFrom: (AppEntry, android.graphics.Rect?) -> Unit = { app, _ -> onLaunch(app) },
@@ -264,6 +265,7 @@ fun LauncherScreen(
     }
     LaunchedEffect(pager.settledPage) { if (pager.settledPage != homePages) focus.clearFocus() }
     LaunchedEffect(state.verticalStatus) { onStatusMode(state.verticalStatus) }
+    LaunchedEffect(state.fullscreenLauncher) { onFullscreenMode(state.fullscreenLauncher) }
     LaunchedEffect(homeRequests) { if (homeRequests > 0) {
         // An app can pause Home after the destination is visible but before its settle completes.
         val page = pager.currentPage.takeIf { it in 0 until homePages }
@@ -577,13 +579,20 @@ fun LauncherScreen(
                                 detectTapGestures(onDoubleTap = { onLockScreen() })
                             } else Modifier
                         )) {
-                            HomePagePane(page, state, previewLayout.slots, previewLayout.leadingSlots, previewLayout.widgetPlacements, appsById, geometry, contentHeight,
-                                bottomSpace, widgets, drag, target, insertionTarget, showLargeWidget = false,
-                                onLaunch = onLaunchFrom, onActions = { selectedId = it.id },
-                                onWidget = { widgetSlot = it; sheet = "widgetActions" },
-                                onFolder = { openFolderId = it },
-                                onEmptyWidget = { emptyCellIndex = it },
-                                onRefresh = model::refresh)
+                            Box(Modifier.fillMaxSize()) {
+                                // App, widget, and empty-cell handlers sit above this background.
+                                // It therefore opens customization only for otherwise-unused Home space.
+                                Box(Modifier.matchParentSize().pointerInput(drag.active) {
+                                    detectTapGestures(onLongPress = { if (!drag.active) sheet = "settings" })
+                                })
+                                HomePagePane(page, state, previewLayout.slots, previewLayout.leadingSlots, previewLayout.widgetPlacements, appsById, geometry, contentHeight,
+                                    bottomSpace, widgets, drag, target, insertionTarget, showLargeWidget = false,
+                                    onLaunch = onLaunchFrom, onActions = { selectedId = it.id },
+                                    onWidget = { widgetSlot = it; sheet = "widgetActions" },
+                                    onFolder = { openFolderId = it },
+                                    onEmptyWidget = { emptyCellIndex = it },
+                                    onRefresh = model::refresh)
+                            }
                         }
                     }
                 }
@@ -604,12 +613,18 @@ fun LauncherScreen(
                 }.testTag("dock"),
                 shape = RoundedCornerShape(30.dp), color = Glass.copy(alpha = .32f),
                 border = androidx.compose.foundation.BorderStroke(1.dp, Color.White.copy(alpha = .3f))) {
-                Column(Modifier.padding(vertical = 8.dp).verticalScroll(dockScroll)) {
-                    DockAppColumn(state.dock, previewLayout.dock, appsById, geometry.dockRowHeight,
-                        dockIconSize(geometry.iconSize), drag, insertionTarget,
-                        onLaunch = onLaunchFrom, onChoose = onChooseDock)
-                    DockRecents(visibleDockRecentIds(state, appsById.keys).mapNotNull(appsById::get), geometry.dockRowHeight,
-                        dockIconSize(geometry.iconSize), onLaunchFrom) { selectedId = it.id }
+                Box(Modifier.fillMaxSize()) {
+                    // This sits behind dock apps, so only unused dock background reaches it.
+                    Box(Modifier.matchParentSize().pointerInput(drag.active) {
+                        detectTapGestures(onLongPress = { if (!drag.active) sheet = "settings" })
+                    })
+                    Column(Modifier.padding(vertical = 8.dp).verticalScroll(dockScroll)) {
+                        DockAppColumn(state.dock, previewLayout.dock, appsById, geometry.dockRowHeight,
+                            dockIconSize(geometry.iconSize), drag, insertionTarget,
+                            onLaunch = onLaunchFrom, onChoose = onChooseDock)
+                        DockRecents(visibleDockRecentIds(state, appsById.keys).mapNotNull(appsById::get), geometry.dockRowHeight,
+                            dockIconSize(geometry.iconSize), onLaunchFrom) { selectedId = it.id }
+                    }
                 }
             }
             Column(Modifier.align(Alignment.BottomStart).width(fullPagerWidth).padding(start = 16.dp, bottom = 6.dp), horizontalAlignment = Alignment.CenterHorizontally) {
@@ -1400,7 +1415,7 @@ private fun HomePagePane(
         .onGloballyPositioned { paneBounds = it.boundsInRoot() }
         .width((geometry.gridWidth + 16f).dp)
         .height((contentHeight - bottomSpace).coerceAtLeast(0.dp))) {
-        Box(Modifier.width(16.dp).fillMaxHeight().testTag("home-options-margin-$page")
+        Box(Modifier.fillMaxSize().testTag("home-options-margin-$page")
             .pointerInput(backgroundTarget, drag.active) {
                 detectTapGestures(onLongPress = {
                     if (!drag.active) onEmptyWidget(backgroundTarget)

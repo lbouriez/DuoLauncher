@@ -102,6 +102,7 @@ class MainActivity : ComponentActivity() {
                 LauncherScreen(state, model, widgets, homeRequests.intValue,
                     onLaunch = { launchApp(it) }, onMakeDefault = ::makeDefault, onAppInfo = ::appInfo,
                     isDefaultHome = defaultHome.value, deviceStatus = deviceStatus, onStatusMode = ::setStatusMode, onWallpaperPreview = ::previewWallpaper,
+                    onFullscreenMode = ::setFullscreenMode,
                     onDiscover = ::openDiscover, searchRequests = searchRequests.intValue,
                     onChooseDock = ::chooseDockApp,
                     onLaunchFrom = ::launchApp, onGoogleSearch = ::openGoogleSearch,
@@ -455,7 +456,21 @@ class MainActivity : ComponentActivity() {
         LiveDiscover.host.get()?.statusMode(vertical)
         val controller = WindowCompat.getInsetsController(window, window.decorView)
         controller.systemBarsBehavior = WindowInsetsControllerCompat.BEHAVIOR_SHOW_TRANSIENT_BARS_BY_SWIPE
+        if (model.state.value.fullscreenLauncher) {
+            controller.hide(WindowInsetsCompat.Type.systemBars())
+            return
+        }
         if (vertical) controller.hide(WindowInsetsCompat.Type.statusBars()) else controller.show(WindowInsetsCompat.Type.statusBars())
+    }
+
+    private fun setFullscreenMode(fullscreen: Boolean) {
+        val controller = WindowCompat.getInsetsController(window, window.decorView)
+        controller.systemBarsBehavior = WindowInsetsControllerCompat.BEHAVIOR_SHOW_TRANSIENT_BARS_BY_SWIPE
+        if (fullscreen) controller.hide(WindowInsetsCompat.Type.systemBars())
+        else {
+            controller.show(WindowInsetsCompat.Type.navigationBars())
+            setStatusMode(model.state.value.verticalStatus)
+        }
     }
 
     private fun previewWallpaper() {
