@@ -33,9 +33,18 @@ if (( version_code < 1 || version_code > MAX_VERSION_CODE )); then
     exit 1
 fi
 
-echo "Generated Android versionCode $version_code ($commit_count commits + offset $VERSION_CODE_OFFSET)." >&2
+commit_date=$(git show -s --format=%cs "$commit")
+if [[ ! "$commit_date" =~ ^[0-9]{4}-[0-9]{2}-[0-9]{2}$ ]]; then
+    echo "Git did not return a valid commit date for $commit." >&2
+    exit 1
+fi
+# CalVer label, matching the established ReKindle/Kidhoot convention. The commit date keeps a
+# rerun of an exact commit reproducible; the generated code makes labels unique within a month.
+version_name="${commit_date:2:2}.${commit_date:5:2}.${version_code}"
+
+echo "Generated Android version $version_name (code $version_code; $commit_count commits + offset $VERSION_CODE_OFFSET)." >&2
 if [[ -n ${GITHUB_OUTPUT:-} ]]; then
-    printf 'version_code=%s\n' "$version_code" >> "$GITHUB_OUTPUT"
+    printf 'version_code=%s\nversion_name=%s\n' "$version_code" "$version_name" >> "$GITHUB_OUTPUT"
 else
-    printf '%s\n' "$version_code"
+    printf 'version_code=%s\nversion_name=%s\n' "$version_code" "$version_name"
 fi

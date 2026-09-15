@@ -3,10 +3,6 @@ name: Build signed release
 on:
   workflow_dispatch:
     inputs:
-      version_name:
-        description: Optional safe versionName override; leave empty to use the configured project value.
-        required: false
-        type: string
       create_draft_release:
         description: Create an unpublished GitHub draft release after verification.
         required: true
@@ -64,7 +60,7 @@ jobs:
         env:
           DUO_APPLICATION_ID: ${{ vars.DUO_APPLICATION_ID }}
           DUO_VERSION_CODE: ${{ steps.version.outputs.version_code }}
-          DUO_VERSION_NAME: ${{ inputs.version_name }}
+          DUO_VERSION_NAME: ${{ steps.version.outputs.version_name }}
         run: ./scripts/validate-release-config.sh --require-fork-id
       - name: Validate required signing configuration
         shell: bash
@@ -91,7 +87,7 @@ jobs:
         env:
           DUO_APPLICATION_ID: ${{ vars.DUO_APPLICATION_ID }}
           DUO_VERSION_CODE: ${{ steps.version.outputs.version_code }}
-          DUO_VERSION_NAME: ${{ inputs.version_name }}
+          DUO_VERSION_NAME: ${{ steps.version.outputs.version_name }}
         run: |
           set -euo pipefail
           ./gradlew --no-daemon --quiet :app:printReleaseMetadata > "$RUNNER_TEMP/duo-release-metadata"
@@ -132,7 +128,7 @@ jobs:
         env:
           DUO_APPLICATION_ID: ${{ vars.DUO_APPLICATION_ID }}
           DUO_VERSION_CODE: ${{ steps.version.outputs.version_code }}
-          DUO_VERSION_NAME: ${{ inputs.version_name }}
+          DUO_VERSION_NAME: ${{ steps.version.outputs.version_name }}
           DUO_RELEASE_STORE_PASSWORD: ${{ secrets.DUO_RELEASE_STORE_PASSWORD }}
           DUO_RELEASE_KEY_ALIAS: ${{ secrets.DUO_RELEASE_KEY_ALIAS }}
           DUO_RELEASE_KEY_PASSWORD: ${{ secrets.DUO_RELEASE_KEY_PASSWORD }}

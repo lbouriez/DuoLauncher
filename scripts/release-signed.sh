@@ -27,9 +27,15 @@ if ! git -C "$repository_root" rev-parse --verify --quiet "$source_commit^{commi
     echo "DUO_SOURCE_COMMIT must identify a commit in this checkout." >&2
     exit 1
 fi
-if [[ -z ${DUO_VERSION_CODE:-} ]]; then
-    export DUO_VERSION_CODE=$("$repository_root/scripts/generate-release-version.sh" "$source_commit")
-fi
+generated_version=$("$repository_root/scripts/generate-release-version.sh" "$source_commit")
+generated_version_code=$(sed -n 's/^version_code=//p' <<< "$generated_version")
+generated_version_name=$(sed -n 's/^version_name=//p' <<< "$generated_version")
+[[ -n "$generated_version_code" && -n "$generated_version_name" ]] || {
+    echo "Could not generate release version metadata." >&2
+    exit 1
+}
+export DUO_VERSION_CODE=${DUO_VERSION_CODE:-$generated_version_code}
+export DUO_VERSION_NAME=${DUO_VERSION_NAME:-$generated_version_name}
 
 metadata=$("$repository_root/scripts/gradle.sh" --quiet :app:printReleaseMetadata)
 application_id=$(sed -n 's/^applicationId=//p' <<< "$metadata")
@@ -39,7 +45,6 @@ version_name=$(sed -n 's/^versionName=//p' <<< "$metadata")
     echo "Could not read effective release metadata from Gradle." >&2
     exit 1
 }
-export DUO_VERSION_NAME=${DUO_VERSION_NAME:-$version_name}
 "$repository_root/scripts/validate-release-config.sh" --require-fork-id
 
 build_label=${DUO_BUILD_LABEL:-local}

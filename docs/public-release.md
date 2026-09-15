@@ -78,10 +78,9 @@ The workflow decodes the keystore only under `RUNNER_TEMP`, outside both the che
 
 1. Push the pipeline change and wait for **Android CI**. Its debug artifact is useful for development but is not the release APK.
 2. Open **Actions → Build signed release → Run workflow**. GitHub must show your fork's default branch; the workflow refuses any other ref.
-3. The workflow automatically generates `versionCode` from the exact commit's full Git-history count plus the checked-in fork offset. The offset is based on the last signed fork build (code 31), so the next new commit receives a higher code. It never uses a clock or GitHub run number. Re-running the exact same commit deliberately produces the same version code; distribute a newer main commit for an Android update.
-4. Optionally enter a safe `version_name` (letters, digits, `.`, `_`, and `-`, maximum 64 characters). Leave it blank to use the project value. The override is passed to Gradle as an environment value; the workflow does not edit or commit source files.
-5. **Create draft release** is selected by default. Keep it selected to create an unpublished GitHub draft after verification, with notes listing merged pull requests since the preceding fork release. Clear it only when you specifically want artifacts without a draft. Run the workflow.
-6. In the successful run's **Artifacts** section, download the signed-build artifact. Install the `.apk` on the phone. Keep the `.aab` for a future Play Console submission. `BUILD-METADATA.txt` and `SHA256SUMS.txt` identify exactly what was built; the separate R8 mapping artifact is for diagnostics.
+3. The workflow automatically generates both Android version values from the exact commit: `versionCode` is the full Git-history count plus the checked-in fork offset, and `versionName` is CalVer in the form `YY.MM.versionCode` (for example, `26.09.71`). It never uses a clock at build time or a GitHub run number. Re-running the exact same commit deliberately produces the same version; distribute a newer main commit for an Android update.
+4. **Create draft release** is selected by default. Keep it selected to create an unpublished GitHub draft after verification, with notes listing merged pull requests since the preceding fork release. Clear it only when you specifically want artifacts without a draft. Run the workflow.
+5. In the successful run's **Artifacts** section, download the signed-build artifact. Install the `.apk` on the phone. Keep the `.aab` for a future Play Console submission. `BUILD-METADATA.txt` and `SHA256SUMS.txt` identify exactly what was built; the separate R8 mapping artifact is for diagnostics.
 
 The workflow uses Android `apksigner` for the APK and confirms package ID, version code/name, release debuggability, test-only status, and configured certificate fingerprint. It uses Java `jarsigner`/`keytool` for the AAB because `apksigner` does not verify Android App Bundles. A normal warning about a valid self-signed owner certificate is not the same thing as an unsigned or invalid bundle.
 
@@ -118,7 +117,6 @@ export DUO_RELEASE_STORE_FILE=/absolute/path/outside/the/repository/duolauncher-
 export DUO_RELEASE_STORE_PASSWORD='set privately in your shell'
 export DUO_RELEASE_KEY_ALIAS='your-key-alias'
 export DUO_RELEASE_KEY_PASSWORD='set privately in your shell'
-# Optional: export DUO_VERSION_NAME='0.16.0'
 ./scripts/release-signed.sh
 ```
 
