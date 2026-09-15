@@ -63,8 +63,10 @@ printf '%s\n' "$apk_certificate_output" | grep -q 'Verified using v[1-4] scheme'
     echo "APK signature verification did not report a verified signing scheme." >&2
     exit 1
 }
+# apksigner has varied its leading whitespace across build-tools releases.  Extract
+# the digest field rather than relying on the line starting in column one.
 apk_fingerprint=$(printf '%s\n' "$apk_certificate_output" \
-    | sed -n 's/^Signer #1 certificate SHA-256 digest: //p' | head -n 1 | normalize_fingerprint)
+    | awk '/Signer #1 certificate SHA-256 digest:/ { print $NF; exit }' | normalize_fingerprint)
 [[ "$apk_fingerprint" == "$expected_fingerprint" ]] || {
     echo "APK signer does not match the configured signing certificate." >&2
     echo "Expected certificate SHA-256: $expected_fingerprint" >&2
