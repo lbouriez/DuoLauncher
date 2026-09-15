@@ -6,6 +6,8 @@ import android.graphics.Matrix
 import android.graphics.Paint
 import android.graphics.Path
 import android.graphics.PixelFormat
+import android.graphics.RenderEffect
+import android.graphics.Shader
 import android.animation.ValueAnimator
 import android.view.View
 import android.view.WindowInsets
@@ -63,6 +65,13 @@ internal class DiscoverFrame(private val activity: Activity, private val vertica
                 color = 0x66ffffff; style = Paint.Style.STROKE; strokeWidth = resources.displayMetrics.density
             }
             private val cover = Paint()
+            // Google's embedded activity intentionally stays inside Android's safe viewport.
+            // Blur only the Duo backdrop visible outside that viewport; applying an effect to the
+            // host window would also blur or destabilize the external Google surface.
+            private val backdropBlur = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+                if (live) setRenderEffect(RenderEffect.createBlurEffect(12f * resources.displayMetrics.density,
+                    12f * resources.displayMetrics.density, Shader.TileMode.CLAMP))
+            }
             override fun onAttachedToWindow() {
                 super.onAttachedToWindow()
                 windowInsetsController?.apply {
@@ -100,6 +109,9 @@ internal class DiscoverFrame(private val activity: Activity, private val vertica
                     clipPath.addRoundRect(left, 0f, right, height.toFloat(), 16*d, 16*d, Path.Direction.CW)
                     val save = canvas.save()
                     canvas.clipOutPath(clipPath)
+                    // The clip remains active when the blurred layer is composited, so the blur
+                    // cannot bleed over the touchable Google feed at the viewport edge.
+                    val blurLayer = canvas.saveLayer(0f, 0f, width.toFloat(), height.toFloat(), backdropBlur)
                     val layer = LiveDiscover.homeLayer
                     if (layer != null && !layer.isReleased) {
                         canvas.translate(-LiveDiscover.viewport.left.toFloat(), -LiveDiscover.viewport.top.toFloat())
@@ -109,6 +121,7 @@ internal class DiscoverFrame(private val activity: Activity, private val vertica
                             translate(LiveDiscover.pagerOrigin.x, LiveDiscover.pagerOrigin.y) { drawLayer(layer) }
                         }
                     }
+                    canvas.restoreToCount(blurLayer)
                     canvas.restoreToCount(save)
                     return
                 }
