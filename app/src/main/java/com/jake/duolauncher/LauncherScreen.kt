@@ -92,11 +92,6 @@ import kotlinx.coroutines.withContext
 import java.time.LocalDateTime
 import java.time.format.DateTimeFormatter
 
-internal val Ink: Color
-    @Composable get() = LocalDuoPalette.current.ink
-internal val Glass: Color
-    @Composable get() = LocalDuoPalette.current.glass
-
 private fun findFreeWidgetIndex(layout: HomeLayout, page: Int, spanX: Int, spanY: Int): Int? {
     val blocked = layout.widgetPlacements.flatMapTo(mutableSetOf()) { it.coveredIndices() }
     for (row in 0..GRID_ROWS - spanY) for (column in 0..GRID_COLUMNS - spanX) {
@@ -106,19 +101,6 @@ private fun findFreeWidgetIndex(layout: HomeLayout, page: Int, spanX: Int, spanY
         if (cells.none { it in blocked || layout.slotAt(it) != null }) return cells.first()
     }
     return null
-}
-
-@Composable
-fun DuoTheme(dark: Boolean = false, content: @Composable () -> Unit) {
-    val palette = if (dark) DarkDuoPalette else LightDuoPalette
-    CompositionLocalProvider(LocalDuoPalette provides palette) {
-        MaterialTheme(colorScheme = if (dark) darkColorScheme(primary = Color(0xFF9BC5D7), onPrimary = Color(0xFF12303D),
-            surface = Color(0xFF17272E), onSurface = palette.ink, secondary = Color(0xFFD1BE98),
-            secondaryContainer = Color(0xFF314852), onSecondaryContainer = palette.ink)
-        else lightColorScheme(primary = Color(0xFF30596D), onPrimary = Color.White,
-            surface = Color(0xFFF4F7F8), onSurface = palette.ink, secondary = Color(0xFF84775F),
-            secondaryContainer = Color(0xFFDCE8ED), onSecondaryContainer = palette.ink), content = content)
-    }
 }
 
 
