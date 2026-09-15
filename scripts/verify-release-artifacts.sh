@@ -58,7 +58,9 @@ expected_fingerprint=$(keytool -exportcert -rfc -keystore "$DUO_RELEASE_STORE_FI
     | sed -n 's/^[[:space:]]*SHA256:[[:space:]]*//p' | head -n 1 | normalize_fingerprint)
 [[ -n "$expected_fingerprint" ]] || { echo "Could not read the configured signing certificate." >&2; exit 1; }
 
-apk_certificate_output=$("$apksigner" verify --verbose --print-certs "$apk")
+# apksigner can write certificate details to stderr while writing verification
+# status to stdout, so retain both streams for the checks below.
+apk_certificate_output=$("$apksigner" verify --verbose --print-certs "$apk" 2>&1)
 printf '%s\n' "$apk_certificate_output" | grep -q 'Verified using v[1-4] scheme' || {
     echo "APK signature verification did not report a verified signing scheme." >&2
     exit 1
