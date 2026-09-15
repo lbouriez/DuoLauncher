@@ -8,6 +8,9 @@ local.properties
 __pycache__/
 artifacts/
 dist/
+*.apk
+*.aab
+*.idsig
 AGENTS.md
 research/
 discover-probe/

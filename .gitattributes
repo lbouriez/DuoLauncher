@@ -1,0 +1,7 @@
+# Shell workflows must keep LF line endings so they run consistently on local Unix shells and GitHub runners.
+*.sh text eol=lf
+*.yml text eol=lf
+*.yaml text eol=lf
+*.ps1 text eol=crlf
+PUBLIC-FILES text eol=lf
+gradlew text eol=lf

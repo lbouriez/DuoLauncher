@@ -1,6 +1,7 @@
 # Exact files and explicitly public directory trees copied by export-public-source.sh.
 # Prefix an entry with ? when it is allowed but may not exist yet.
 .gitignore
+.gitattributes
 PUBLIC-FILES
 README.md
 LICENSE
@@ -22,7 +23,11 @@ scripts/gradle.sh
 scripts/export-public-source.sh
 scripts/check-public-source.sh
 scripts/release-signed.sh
+scripts/create-release-keystore.ps1
+scripts/validate-release-config.sh
+scripts/verify-release-artifacts.sh
 .github/workflows/ci.yml
+.github/workflows/signed-release.yml
 .github/ISSUE_TEMPLATE/bug_report.yml
 .github/ISSUE_TEMPLATE/feature_request.yml
 .github/ISSUE_TEMPLATE/config.yml

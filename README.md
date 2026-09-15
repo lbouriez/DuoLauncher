@@ -79,7 +79,7 @@ Use JDK 17 or Android Studio's bundled JDK, Android SDK 36, and the included Gra
 ./scripts/gradle.sh :app:assembleDebug :app:testDebugUnitTest :app:lintDebug
 ```
 
-The debug APK is at `app/build/outputs/apk/debug/app-debug.apk`. Release builds use R8 and resource shrinking; private signing material stays outside the repository. Follow [release instructions](docs/public-release.md) for signing and public-source export.
+The debug APK is at `app/build/outputs/apk/debug/app-debug.apk`. Release builds use R8 and resource shrinking; private signing material stays outside the repository. Follow the beginner-friendly [CI and signed-release instructions](docs/public-release.md) for public-source export, fork identity, GitHub Actions signing, and safe updates.
 
 The project uses Kotlin, Jetpack Compose, AndroidX Window, and native widget hosting. Instrumentation runs on disposable emulators. Some integration fixtures require Google, Clock, Chrome, and a configured emulator; they are not commands for your everyday phone.
 

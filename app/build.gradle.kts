@@ -13,6 +13,27 @@ val releaseSigningVariables = listOf(
 val releaseSigningValues = releaseSigningVariables.associateWith { name ->
     System.getenv(name)?.takeIf { it.isNotBlank() }
 }
+
+val upstreamApplicationId = "com.jake.duolauncher"
+val applicationIdOverride = System.getenv("DUO_APPLICATION_ID")?.takeIf { it.isNotBlank() }
+val effectiveApplicationId = applicationIdOverride ?: upstreamApplicationId
+val applicationIdPattern = Regex("[A-Za-z][A-Za-z0-9_]*(\\.[A-Za-z][A-Za-z0-9_]*)+")
+check(applicationIdPattern.matches(effectiveApplicationId)) {
+    "DUO_APPLICATION_ID must be a valid Android application ID with at least two dot-separated segments."
+}
+
+val configuredVersionCode = System.getenv("DUO_VERSION_CODE")?.takeIf { it.isNotBlank() }?.let { value ->
+    value.toIntOrNull()?.takeIf { it in 1..2_100_000_000 }
+        ?: error("DUO_VERSION_CODE must be an integer from 1 through 2100000000.")
+}
+val configuredVersionName = System.getenv("DUO_VERSION_NAME")?.takeIf { it.isNotBlank() }
+val versionNamePattern = Regex("[0-9A-Za-z][0-9A-Za-z._-]{0,63}")
+check(configuredVersionName == null || versionNamePattern.matches(configuredVersionName)) {
+    "DUO_VERSION_NAME must use only letters, numbers, dots, underscores, or hyphens and be at most 64 characters."
+}
+
+val effectiveVersionCode = configuredVersionCode ?: 30
+val effectiveVersionName = configuredVersionName ?: "0.15.0-beta01"
 val suppliedReleaseSigningVariables = releaseSigningValues.filterValues { it != null }.keys
 check(suppliedReleaseSigningVariables.isEmpty() || suppliedReleaseSigningVariables.size == releaseSigningVariables.size) {
     val missing = releaseSigningVariables.filterNot(suppliedReleaseSigningVariables::contains)
@@ -32,14 +53,14 @@ val releaseStoreFile = releaseSigningValues["DUO_RELEASE_STORE_FILE"]?.let { con
 }
 
 android {
-    namespace = "com.jake.duolauncher"
+    namespace = upstreamApplicationId
     compileSdk = 36
     defaultConfig {
-        applicationId = "com.jake.duolauncher"
+        applicationId = effectiveApplicationId
         minSdk = 31
         targetSdk = 36
-        versionCode = 30
-        versionName = "0.15.0-beta01"
+        versionCode = effectiveVersionCode
+        versionName = effectiveVersionName
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }
     signingConfigs {
@@ -53,6 +74,9 @@ android {
         }
     }
     buildTypes {
+        getByName("debug") {
+            applicationIdSuffix = ".debug"
+        }
         getByName("release") {
             isMinifyEnabled = true
             isShrinkResources = true
@@ -69,6 +93,16 @@ android {
         targetCompatibility = JavaVersion.VERSION_17
     }
     kotlinOptions { jvmTarget = "17" }
+}
+
+tasks.register("printReleaseMetadata") {
+    group = "help"
+    description = "Prints effective application and version metadata for release packaging."
+    doLast {
+        println("applicationId=$effectiveApplicationId")
+        println("versionCode=$effectiveVersionCode")
+        println("versionName=$effectiveVersionName")
+    }
 }
 dependencies {
     implementation("androidx.window:window:1.5.1")

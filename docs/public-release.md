@@ -1,113 +1,146 @@
-# Public release process
+# CI and signed Android releases
 
-Duo Launcher requires Android API 31 or newer and builds with Java 17. A fresh source export can
-build the debug APK, run local unit tests and lint, and assemble an unsigned optimized release:
+This fork builds with Java 17 and Android SDK 36. It has two deliberately different GitHub Actions workflows:
+
+- **Android CI** runs for pull requests and branch pushes without release secrets. It validates the Gradle wrapper, exports and validates the allowlisted public source tree, builds a debug APK, runs unit tests and lint, and compiles the optimized unsigned release variant. Its `duo-launcher-debug-development-*` artifact is for development only.
+- **Build signed release** is manual, accepts only this repository's default branch, and builds the exact selected commit. It checks the same exported source, then creates a signed APK and AAB using the stable signing key you configure in GitHub.
+
+CI's debug APK is not a signed release APK. A GitHub runner creates a fresh debug key when no local debug key exists, so that key is not a stable identity for personal updates. Debug builds also use an `.debug` application-ID suffix and therefore do not replace the signed fork installation.
+
+## Required one-time setup
+
+### 1. Enable Actions and choose the fork identity
+
+If GitHub shows an **Actions are disabled** banner in the fork, open the repository's **Actions** tab and enable workflows. In **Settings → Actions → General**, allow actions as appropriate for your fork; this repository pins the actions it uses to reviewed commit SHAs.
+
+Choose a permanent Android application ID before your first distributed fork build, for example a reverse-domain identifier you control such as `dev.example.duolauncher`. Do **not** copy that example unless it is yours. It must contain at least two dot-separated segments, begin every segment with a letter, and use only letters, digits, and underscores in segments.
+
+In **Settings → Secrets and variables → Actions → Variables**, create this repository variable:
+
+| Variable | Value |
+| --- | --- |
+| `DUO_APPLICATION_ID` | Your chosen valid fork application ID, not `com.jake.duolauncher` |
+
+The signed workflow refuses a missing ID and refuses the upstream ID. Keeping your fork ID stable makes it install alongside upstream and allows later same-signer updates. The Kotlin namespace remains unchanged; Gradle supplies the runtime application ID, and the manifest's task affinity and accessibility package filter follow it.
+
+### 2. Create and protect one permanent keystore
+
+Run this **privately on your own computer**, outside the repository. Pick a memorable alias, your own passwords, and a safe path. Do not paste any password or key into Codex, source files, issues, logs, or chats.
 
 ```sh
-./gradlew :app:assembleDebug :app:testDebugUnitTest :app:lintDebug
-./gradlew :app:assembleRelease
+keytool -genkeypair -v -keystore /safe/private/duolauncher-release.p12 \
+  -storetype PKCS12 -alias your-key-alias -keyalg RSA -keysize 4096 -validity 10000
 ```
 
-The release build enables R8 and resource shrinking. Its keep rules retain the Window Extensions
-interfaces that the optional Discover host resolves by name. Launcher persistence uses explicit
-`org.json` fields, and Android widget hosts are directly constructed, so they do not need broad
-serialization or reflection rules.
+On Windows, the repository also includes a helper that generates a cryptographically random password, creates the PKCS12 key, Base64-encodes it, and writes the exact GitHub variable/secret values to a private directory. Supply your permanent fork ID yourself; this command refuses the upstream ID and never writes into the repository:
 
-## Signed packages
+```powershell
+pwsh -File .\scripts\create-release-keystore.ps1 `
+  -ApplicationId 'your.permanent.fork.id' `
+  -OutputDirectory 'C:\safe\duolauncher-release'
+```
 
-Keep the release keystore outside the repository. The signed release helper requires all four
-values below and does not print them:
+The helper prints only private file paths by default. Add `-ShowSecrets` only when you are ready to copy values into GitHub locally. Back up the generated `.p12`, alias, and passwords; then securely remove the temporary `*.base64.txt` and `*-github-secrets.txt` files after entering GitHub's secrets.
+
+PKCS12 is recommended because it is a modern portable format. With PKCS12, use the same key password as the keystore password when prompted; Java's tooling can otherwise ignore a distinct key password. A JKS keystore also works if you already have one. Android trusts the certificate embedded in the APK; it does not need a public CA certificate.
+
+Back up the keystore file, alias, and passwords in secure, separate storage before distributing anything. Losing the key means you cannot ship a compatible update for this application ID. Changing either the application ID or signing identity after distribution creates a different Android app for update purposes.
+
+### 3. Encode the private keystore and create the environment
+
+Encode the keystore without adding it to Git:
 
 ```sh
-export DUO_RELEASE_STORE_FILE=/absolute/path/outside/the/repository/duolauncher-release.jks
-export DUO_RELEASE_STORE_PASSWORD='...'
-export DUO_RELEASE_KEY_ALIAS='...'
-export DUO_RELEASE_KEY_PASSWORD='...'
+# Linux
+base64 -w 0 /safe/private/duolauncher-release.p12 > duolauncher-release.base64
+
+# macOS
+base64 -i /safe/private/duolauncher-release.p12 | tr -d '\n' > duolauncher-release.base64
+
+# Windows PowerShell
+[Convert]::ToBase64String([IO.File]::ReadAllBytes('C:\safe\private\duolauncher-release.p12')) | Set-Content -NoNewline -Encoding ascii duolauncher-release.base64
+```
+
+Open **Settings → Environments**, create `android-release`, and configure its deployment branch policy to permit only the repository's default branch. Environment configuration is a GitHub setting and cannot be committed in this repository. Optional hardening is to require a reviewer before jobs using this environment receive secrets.
+
+Inside that environment, add these four secrets:
+
+| Secret | Private value |
+| --- | --- |
+| `DUO_RELEASE_KEYSTORE_BASE64` | Complete contents of `duolauncher-release.base64` |
+| `DUO_RELEASE_STORE_PASSWORD` | Keystore password |
+| `DUO_RELEASE_KEY_ALIAS` | Alias selected with `keytool` |
+| `DUO_RELEASE_KEY_PASSWORD` | Key password (the store password for the PKCS12 example) |
+
+The workflow decodes the keystore only under `RUNNER_TEMP`, outside both the checkout and public-source export. It gives the temporary file restrictive permissions, uses it only in signing/verification steps, and deletes it even after failures. It never generates a production key or falls back to the debug key.
+
+## First signed build
+
+1. Push the pipeline change and wait for **Android CI**. Its debug artifact is useful for development but is not the release APK.
+2. Open **Actions → Build signed release → Run workflow**. GitHub must show your fork's default branch; the workflow refuses any other ref.
+3. Enter a positive `version_code` between 1 and 2,100,000,000. For the first fork build, choose a value you can increase later. GitHub and this repository cannot tell you the highest code you previously uploaded to Play, so verify that yourself before a Play upload.
+4. Optionally enter a safe `version_name` (letters, digits, `.`, `_`, and `-`, maximum 64 characters). Leave it blank to use the project value. These overrides are passed to Gradle as environment values; the workflow does not edit or commit source files.
+5. Leave **create draft release** off for the normal artifact-only flow. Run the workflow.
+6. In the successful run's **Artifacts** section, download the signed-build artifact. Install the `.apk` on the phone. Keep the `.aab` for a future Play Console submission. `BUILD-METADATA.txt` and `SHA256SUMS.txt` identify exactly what was built; the separate R8 mapping artifact is for diagnostics.
+
+The workflow uses Android `apksigner` for the APK and confirms package ID, version code/name, release debuggability, test-only status, and configured certificate fingerprint. It uses Java `jarsigner`/`keytool` for the AAB because `apksigner` does not verify Android App Bundles. A normal warning about a valid self-signed owner certificate is not the same thing as an unsigned or invalid bundle.
+
+To update the APK installation later, keep the same `DUO_APPLICATION_ID`, same keystore/alias, and use a strictly higher `version_code`. Android then preserves the launcher data while replacing the old version. A lower code reports a version-downgrade failure; a different signing certificate reports a signature mismatch. Uninstalling first loses launcher data, so do not use it as an update workaround unless that loss is acceptable.
+
+## APK, AAB, signing, and Play
+
+- An **APK** is directly installable on a phone.
+- An **AAB** is uploaded to Google Play; Play creates device-specific APKs. It is not normally installed directly.
+- **Release signing** proves who built the package and enables Android's same-signer updates. It does not mean Google has reviewed, approved, or published the app.
+- A Play **upload key** may be different from the Play app-signing key. Decide whether the certificate used for direct GitHub APKs must also be the signing identity users receive through Play before the first Play submission. A GitHub-installed APK and a Play-installed app are not automatically update-compatible just because this pipeline produced both files.
+
+Before first Play submission, settle the permanent application ID, signing-key backup plan, whether to use Play App Signing, and the relation between your direct-distribution key and Play's app-signing/upload keys. This pipeline does not upload to Google Play and does not publish a production release.
+
+## Optional draft GitHub release
+
+Set **create draft release** to true only when you want GitHub to create an unpublished draft after every check and package verification succeeds. The signing job retains read-only token access. A separate publishing job receives only `contents: write`, downloads the verified artifact, and creates a draft with the tag format:
+
+```text
+duolauncher-fork-v<versionName>-<versionCode>
+```
+
+It refuses to overwrite an existing tag or release. The draft is not published automatically. This fork-specific prefix avoids collisions with inherited upstream tags.
+
+## Local signed build and public-source export
+
+The same signing integration can be exercised locally. Keep the key outside the checkout and set the stable fork ID explicitly:
+
+```sh
+export DUO_APPLICATION_ID='your.permanent.fork.id'
+export DUO_RELEASE_STORE_FILE=/absolute/path/outside/the/repository/duolauncher-release.p12
+export DUO_RELEASE_STORE_PASSWORD='set privately in your shell'
+export DUO_RELEASE_KEY_ALIAS='your-key-alias'
+export DUO_RELEASE_KEY_PASSWORD='set privately in your shell'
+export DUO_VERSION_CODE=101
+# Optional: export DUO_VERSION_NAME='0.16.0'
 ./scripts/release-signed.sh
 ```
 
-The public release key is separate from Android's debug key. Because both variants intentionally
-use `com.jake.duolauncher`, Android will not install one as an update to an installation signed by
-the other key. Preserve an existing configured debug installation; test the public release on a
-separate device or disposable emulator unless a deliberate migration has been planned.
+The helper builds APK and AAB, verifies them, makes an allowlisted source archive, records metadata, computes checksums, and preserves R8 mapping separately. It refuses keys inside the repository, partial signing configuration, invalid fork identity, invalid versions, and an existing output directory.
 
-Supplying only some signing values fails configuration. Supplying none leaves ordinary
-`assembleRelease` available as an unsigned build, including in CI. The helper refuses a keystore
-inside the repository and refuses to overwrite an existing release directory. It packages the
-signed APK, the allowlisted public source archive, and SHA-256 checksums under `dist/`.
-
-## Public source export
-
-`PUBLIC-FILES` is the source allowlist. Exporting fails on symlinks, missing required build files,
-private paths, key files, non-image files under `docs/images`, or a destination that already
-exists:
+`PUBLIC-FILES` remains the source allowlist. The exported source has no `.git`, so workflows capture the exact commit before export and record it in build metadata:
 
 ```sh
 ./scripts/export-public-source.sh /tmp/DuoLauncher-public
 ./scripts/check-public-source.sh /tmp/DuoLauncher-public
 ```
 
-The checker validates a pristine exported tree. Running it with no argument in the private working
-tree is expected to reject Git metadata, Gradle output, and internal files that are deliberately
-outside the allowlist. CI exports into its temporary directory first, then builds and tests from
-that exported copy.
+The checker rejects symlinks, non-allowlisted files, private paths, key files, and common credential patterns. New public scripts and workflows are explicitly allowlisted; no keystore, local signing properties, or build output is included.
 
-The public tree includes the Android application, Gradle wrapper, unit and instrumentation tests,
-release helpers, CI workflow, public root documents, this guide, and optional PNG/WebP screenshots
-under `docs/images`. Internal working notes, research, device captures, artifacts, local Android SDK
-configuration, and the isolated Discover probe are excluded. The probe remains optional in the
-working tree and does not participate in normal launcher builds.
+## Troubleshooting
 
-The [user guide](user-guide.md), [troubleshooting](troubleshooting.md), [contributor code map](architecture.md),
-and [beta notes](releases/0.15.0-beta01.md) are part of the explicit public allowlist.
-
-## GitHub publication
-
-Publish from the reviewed public Git checkout, with the chosen license committed. Confirm the
-repository owner/name and intended visibility before creating the remote. The repository already
-contains a README, license, issue forms, a pull-request template and CI; do not initialize a second
-README or license on GitHub when importing it.
-
-For the first upload, create the repository from that checkout with `gh repo create` using its
-explicit owner/name, visibility, `--source .`, `--remote origin` and `--push` options. This makes the
-committed source visible according to the chosen repository visibility. Wait for the Android CI
-workflow and inspect failures before publishing the beta APK.
-
-Create the version tag on the reviewed release commit and push that tag. Create a prerelease
-with `gh release create`, `--verify-tag`, `--prerelease` and `--notes-file`; `--draft` keeps the
-release unpublished while its attachments and description are checked. Attach only the signed
-release APK, matching public source archive and `SHA256SUMS.txt` from the prepared package.
-Do not attach a personal debug APK, signing configuration or device validation artifacts.
-
-The beta notes use relative links for browsing in the source tree. Before copying them into a
-GitHub Release description, resolve those links to the selected repository's tagged `blob` URLs.
-Check the downloads, notes and checksums once more before publishing the draft. The regular
-Actions workflow builds unsigned artifacts and does not need the private release key.
-
-For later versions, increase Android's `versionCode`, update `versionName` and the release-helper
-version, update the changelog and tested scope, and retain the original signing identity.
-Add each new public release-notes file to `PUBLIC-FILES` and `.gitignore`. Keep prior published
-packages intact so users can identify exactly what they installed.
-
-## Beta 0.15.0-beta01 validation
-
-This is an experimental Fold beta, not a general Android compatibility certification.
-
-| Environment | Checked scope |
+| Symptom | What to check |
 | --- | --- |
-| Galaxy Fold8, Android 17, inner display | Same-signer personal upgrade, actual live Discover and return to Home; all 12 widget bindings and launcher preferences preserved |
-| Pixel Fold emulator, Android 17, cover and inner Fold dimensions | 44 focused checks covering setup, customization, photo recovery, native widget gestures, Home return, and retained Discover motion; all passed |
-| Fresh Android 15 emulator, signed release | Populated 0.14.7-to-beta upgrade, native Clock setup/binding preservation, cold start and reboot, welcome at larger text size, Android Home selection, large-font Help, shade-access cancellation, and local search/Discover recovery with Google disabled |
+| Missing environment secret/configuration | Confirm all four secrets are in `android-release`, the job is allowed on the default branch, and `DUO_APPLICATION_ID` is a repository variable. |
+| Invalid password or alias | Re-check the privately stored keystore type, store password, alias, and key password. Recreate the Base64 file from the same keystore, not a new one. |
+| Signer mismatch | The APK/AAB was not signed with the configured alias/certificate. Do not replace the permanent key after distribution. |
+| `INSTALL_FAILED_VERSION_DOWNGRADE` | Build again with a version code greater than the installed APK. |
+| Existing app will not update | Both application ID and signing certificate must match the installed app. A debug build, upstream install, or Play installation may use a different identity. |
+| Workflow is skipped | Launch it from the actual repository default branch. This is intentional; PRs, tags, and arbitrary branches never receive production signing. |
 
-The Android 15 emulator's bundled Google app did not supply a Discover feed. The recovery view
-and return to Home worked; this environment establishes fallback behavior, not live-feed support.
-The physical Fold uses a developer-signed build to preserve its existing installation. The public
-signer's optimized APK was exercised separately on the disposable Android 15 emulator.
-
-The source passed 136 local unit tests and lint with no errors (75 warnings). A clean allowlisted
-export built independently without the private workspace's SDK configuration or research module.
-The GitHub workflow is supplied but has not yet run remotely.
-
-Still needed: another physical Fold/vendor combination, a real SIM-equipped device, and longer
-release performance and battery testing. The reference Fold has no SIM, so its unavailable cellular
-indicator is expected. Emulator results do not establish physical animation smoothness.
+The workflow verifies package mechanics only. It does not claim production readiness, device compatibility, battery behavior, Play approval, or release quality beyond the checks it actually ran.

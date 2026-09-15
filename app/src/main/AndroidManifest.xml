@@ -18,7 +18,7 @@
         <property android:name="android.window.PROPERTY_ACTIVITY_EMBEDDING_ALLOW_SYSTEM_OVERRIDE" android:value="false" />
         <activity android:name=".DiscoverActivity" android:exported="false"
             android:theme="@style/Theme.Duo.Discover"
-            android:taskAffinity="com.jake.duolauncher.discover" android:excludeFromRecents="true"
+            android:taskAffinity="${applicationId}.discover" android:excludeFromRecents="true"
             android:resizeableActivity="true" />
         <activity android:name=".DiscoverFeedActivity" android:theme="@style/Theme.Duo.Discover" android:exported="false" android:resizeableActivity="true" />
         <activity android:name=".LiveDiscoverActivity" android:theme="@style/Theme.Duo.LiveDiscover"
