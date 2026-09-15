@@ -118,7 +118,7 @@ internal fun CustomizationSheet(state: LauncherState, initiallyWide: Boolean, mo
                     SettingsSwitch("Search button opens Google", state.googleSearch, model::setGoogleSearch, "google-search-switch")
                     SettingsSwitch("Double tap empty Home space to lock", state.doubleTapToLock, model::setDoubleTapToLock, "double-tap-lock-switch")
                     SettingsSwitch("Fullscreen launcher", state.fullscreenLauncher, model::setFullscreenLauncher, "fullscreen-launcher-switch")
-                    Text("Hides Android status and navigation bars while Duo is on screen. Swipe from an edge to reveal them temporarily.",
+                    Text("Applies to Duo Home and All apps. Google Discover is an embedded Google surface and keeps Android's safe bounds. Swipe from an edge to reveal system controls temporarily.",
                         style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                     SettingsSwitch("Show recent apps in dock", state.showRecentApps, model::setShowRecentApps, "dock-recents-switch")
                     Text("All apps always keeps local app search.", style = MaterialTheme.typography.bodySmall,

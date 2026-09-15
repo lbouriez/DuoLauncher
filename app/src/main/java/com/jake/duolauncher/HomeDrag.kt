@@ -198,3 +198,37 @@ internal fun Modifier.homeDragInput(
         }
     }
 }
+
+/**
+ * Opens launcher customization from genuinely empty Home or dock space.
+ *
+ * This is deliberately installed on the root, rather than behind individual panes: a full-size
+ * scroll container otherwise wins hit testing even in visual gaps. Movable apps and widgets are
+ * left to [homeDragInput], while an empty registered cell (or unused dock area) is consistent
+ * regardless of which child composable happens to cover it.
+ */
+@Composable
+internal fun Modifier.emptySpaceSettingsInput(
+    drag: HomeDragState,
+    enabled: Boolean,
+    eligiblePages: Set<Int>,
+    onOpen: () -> Unit,
+): Modifier {
+    val currentEnabled by rememberUpdatedState(enabled)
+    val currentEligiblePages by rememberUpdatedState(eligiblePages)
+    val open by rememberUpdatedState(onOpen)
+    return pointerInput(drag) {
+        awaitEachGesture {
+            val down = awaitFirstDown(requireUnconsumed = false, pass = PointerEventPass.Initial)
+            if (!currentEnabled) return@awaitEachGesture
+            val region = drag.hit(down.position + drag.rootOrigin, currentEligiblePages)
+            // A populated cell owns its long press for drag/reorder. Empty cells and unclaimed
+            // background are launcher customization space.
+            if (region?.movable == true) return@awaitEachGesture
+            awaitLongPressOrCancellation(down.id)?.let {
+                it.consume()
+                open()
+            }
+        }
+    }
+}

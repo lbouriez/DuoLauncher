@@ -411,7 +411,14 @@ fun LauncherScreen(
                 pager.scrollToPage(lastHomePage.coerceIn(0, homePages - 1))
             }
         },
-        onFinish = { cancelled -> finishDrag(cancelled) })) {
+        onFinish = { cancelled -> finishDrag(cancelled) }
+    ).emptySpaceSettingsInput(
+        drag = drag,
+        enabled = sheet.isEmpty() && !showFirstRun && selectedId == null && resizeSlot == null &&
+            !drag.active && pager.currentPage in 0 until visibleHomePages,
+        eligiblePages = eligibleDragPages,
+        onOpen = { sheet = "settings" },
+    )) {
         DuneWallpaper()
         BoxWithConstraints(Modifier.fillMaxSize().then(
             if (state.fullscreenLauncher) Modifier else Modifier.windowInsetsPadding(WindowInsets.safeDrawing)
@@ -581,20 +588,13 @@ fun LauncherScreen(
                                 detectTapGestures(onDoubleTap = { onLockScreen() })
                             } else Modifier
                         )) {
-                            Box(Modifier.fillMaxSize()) {
-                                // App, widget, and empty-cell handlers sit above this background.
-                                // It therefore opens customization only for otherwise-unused Home space.
-                                Box(Modifier.matchParentSize().pointerInput(drag.active) {
-                                    detectTapGestures(onLongPress = { if (!drag.active) sheet = "settings" })
-                                })
-                                HomePagePane(page, state, previewLayout.slots, previewLayout.leadingSlots, previewLayout.widgetPlacements, appsById, geometry, contentHeight,
-                                    bottomSpace, widgets, drag, target, insertionTarget, showLargeWidget = false,
-                                    onLaunch = onLaunchFrom, onActions = { selectedId = it.id },
-                                    onWidget = { widgetSlot = it; sheet = "widgetActions" },
-                                    onFolder = { openFolderId = it },
-                                    onEmptyWidget = { emptyCellIndex = it },
-                                    onRefresh = model::refresh)
-                            }
+                            HomePagePane(page, state, previewLayout.slots, previewLayout.leadingSlots, previewLayout.widgetPlacements, appsById, geometry, contentHeight,
+                                bottomSpace, widgets, drag, target, insertionTarget, showLargeWidget = false,
+                                onLaunch = onLaunchFrom, onActions = { selectedId = it.id },
+                                onWidget = { widgetSlot = it; sheet = "widgetActions" },
+                                onFolder = { openFolderId = it },
+                                onEmptyWidget = { emptyCellIndex = it },
+                                onRefresh = model::refresh)
                         }
                     }
                 }
@@ -615,18 +615,12 @@ fun LauncherScreen(
                 }.testTag("dock"),
                 shape = RoundedCornerShape(30.dp), color = Glass.copy(alpha = .32f),
                 border = androidx.compose.foundation.BorderStroke(1.dp, Color.White.copy(alpha = .3f))) {
-                Box(Modifier.fillMaxSize()) {
-                    // This sits behind dock apps, so only unused dock background reaches it.
-                    Box(Modifier.matchParentSize().pointerInput(drag.active) {
-                        detectTapGestures(onLongPress = { if (!drag.active) sheet = "settings" })
-                    })
-                    Column(Modifier.padding(vertical = 8.dp).verticalScroll(dockScroll)) {
-                        DockAppColumn(state.dock, previewLayout.dock, appsById, geometry.dockRowHeight,
-                            dockIconSize(geometry.iconSize), drag, insertionTarget,
-                            onLaunch = onLaunchFrom, onChoose = onChooseDock)
-                        DockRecents(visibleDockRecentIds(state, appsById.keys).mapNotNull(appsById::get), geometry.dockRowHeight,
-                            dockIconSize(geometry.iconSize), onLaunchFrom) { selectedId = it.id }
-                    }
+                Column(Modifier.padding(vertical = 8.dp).verticalScroll(dockScroll)) {
+                    DockAppColumn(state.dock, previewLayout.dock, appsById, geometry.dockRowHeight,
+                        dockIconSize(geometry.iconSize), drag, insertionTarget,
+                        onLaunch = onLaunchFrom, onChoose = onChooseDock)
+                    DockRecents(visibleDockRecentIds(state, appsById.keys).mapNotNull(appsById::get), geometry.dockRowHeight,
+                        dockIconSize(geometry.iconSize), onLaunchFrom) { selectedId = it.id }
                 }
             }
             Column(Modifier.align(Alignment.BottomStart).width(fullPagerWidth).padding(start = 16.dp, bottom = 6.dp), horizontalAlignment = Alignment.CenterHorizontally) {
@@ -1389,10 +1383,6 @@ private fun HomePagePane(
 ) {
     val homeScroll = rememberScrollState()
     var paneBounds by remember { mutableStateOf(androidx.compose.ui.geometry.Rect.Zero) }
-    val pageStart = homeCellIndex(page, 0)
-    val backgroundTarget = (pageStart until pageStart + HOME_CELLS).firstOrNull { index ->
-        state.layout.slotAt(index) == null && state.widgetPlacements.none { index in it.coveredIndices() }
-    } ?: pageStart
     val verticalEdge = with(LocalDensity.current) { 42.dp.toPx() }
     LaunchedEffect(drag.active, page, paneBounds) {
         while (drag.active) {
@@ -1408,21 +1398,12 @@ private fun HomePagePane(
         }
     }
     Box(modifier.testTag("home-page-$page")
-        .semantics {
-            onLongClick("Home options") {
-                if (!drag.active) onEmptyWidget(backgroundTarget)
-                !drag.active
-            }
-        }
         .onGloballyPositioned { paneBounds = it.boundsInRoot() }
         .width((geometry.gridWidth + 16f).dp)
         .height((contentHeight - bottomSpace).coerceAtLeast(0.dp))) {
-        Box(Modifier.fillMaxSize().testTag("home-options-margin-$page")
-            .pointerInput(backgroundTarget, drag.active) {
-                detectTapGestures(onLongPress = {
-                    if (!drag.active) onEmptyWidget(backgroundTarget)
-                })
-            })
+        // The root listens for an empty-space long press. Keeping this tag makes the narrow
+        // visual margin addressable for UI tests without placing a competing pointer handler.
+        Box(Modifier.fillMaxSize().testTag("home-options-margin-$page"))
         Column(Modifier.offset(x = 16.dp).width(geometry.gridWidth.dp).fillMaxHeight()
             .verticalScroll(homeScroll).padding(top = geometry.contentTop.dp, bottom = 8.dp)) {
             SharedHomeGrid(page, state.homeSlots, state.leadingSlots, previewSlots, previewLeadingSlots, previewWidgetPlacements,
