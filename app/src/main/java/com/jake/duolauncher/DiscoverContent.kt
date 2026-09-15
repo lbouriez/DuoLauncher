@@ -1,5 +1,6 @@
 package com.jake.duolauncher
 
+import android.app.role.RoleManager
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -16,6 +17,14 @@ import kotlinx.coroutines.delay
 internal fun DiscoverContent(modifier: Modifier = Modifier) {
     val context = androidx.compose.ui.platform.LocalContext.current
     val message = LiveDiscover.message.value
+    // Google grants its launcher overlay only to the active Home app. A signed fork is a
+    // separate Android package from the development APK, so make that prerequisite explicit
+    // instead of implying that release signing or the Google app itself is broken.
+    val isDefaultHome = context.getSystemService(RoleManager::class.java)
+        ?.isRoleHeld(RoleManager.ROLE_HOME) == true
+    val recoveryMessage = if (!isDefaultHome && message != null)
+        "Set Duo as your Home app below, then tap Retry."
+    else message
     val googleIntent = remember(message) {
         context.packageManager.getLaunchIntentForPackage(DiscoverClient.GOOGLE_PACKAGE)
     }
@@ -27,14 +36,14 @@ internal fun DiscoverContent(modifier: Modifier = Modifier) {
     Box(modifier.testTag("discover-page")) {
         // The healthy native feed moves above this page. Keep its backing page transparent
         // so the retained Home layer is revealed during entry and exit, not an empty glass card.
-        if (showMessage && message != null) Surface(Modifier.fillMaxSize().testTag("discover-recovery-surface"),
+        if (showMessage && recoveryMessage != null) Surface(Modifier.fillMaxSize().testTag("discover-recovery-surface"),
             shape = RoundedCornerShape(30.dp), color = Glass.copy(alpha = .92f),
             border = BorderStroke(1.dp, Color.White.copy(alpha = .5f))) {
             Column(Modifier.fillMaxSize().padding(32.dp),
                 verticalArrangement = Arrangement.Center, horizontalAlignment = Alignment.CenterHorizontally) {
                 Text("Discover", style = MaterialTheme.typography.headlineMedium)
                 Spacer(Modifier.height(16.dp))
-                Text(message ?: "", style = MaterialTheme.typography.bodyMedium)
+                Text(recoveryMessage, style = MaterialTheme.typography.bodyMedium)
                 Spacer(Modifier.height(20.dp))
                 FilledTonalButton(onClick = LiveDiscover::retry, Modifier.testTag("discover-retry")) { Text("Retry") }
                 if (googleIntent != null) TextButton(onClick = {

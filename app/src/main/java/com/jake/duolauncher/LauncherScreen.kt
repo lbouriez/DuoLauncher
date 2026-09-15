@@ -571,7 +571,7 @@ fun LauncherScreen(
                     key = { if (it < firstHome) "discover" else if (it - firstHome == visibleHomePages) "library" else "home-${it - firstHome}" }) { physicalPage ->
                     val page = physicalPage - firstHome
                     if (page == -1) {
-                        DiscoverContent(Modifier.fillMaxSize().padding(start = 16.dp, top = 16.dp, bottom = 16.dp))
+                        DiscoverContent(Modifier.fillMaxSize().padding(horizontal = 16.dp, vertical = 16.dp))
                     } else if (page == visibleHomePages) {
                         AppLibrary(state, libraryQuery, { libraryQuery = it }, onLaunch, model::setPinned,
                             onActions = { selectedId = it.id }, modifier = Modifier.width(pagerWidth).fillMaxHeight()
@@ -623,7 +623,7 @@ fun LauncherScreen(
                 if (!isDefaultHome) FilledTonalButton(onClick = { sheet = ""; onMakeDefault() }, Modifier.heightIn(min = 48.dp).testTag("home-setup")) {
                     Icon(Icons.Rounded.Home, null, Modifier.size(18.dp)); Spacer(Modifier.width(8.dp)); Text("Set as home app")
                 }
-                Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.Center) {
+                if (pager.currentPage != -1) Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.Center) {
                     if (!drag.active) IconButton(onClick = openDiscover, Modifier.size(32.dp).testTag("discover-page-link")) {
                         Icon(Icons.Rounded.Explore, "Discover", tint = Color.White.copy(alpha = .65f), modifier = Modifier.size(17.dp))
                     }
@@ -639,7 +639,7 @@ fun LauncherScreen(
                     }
                 }
             }
-            if (!inLibrary && !drag.active && !liveDiscoverShowing) Column(Modifier.align(Alignment.BottomEnd).padding(end = 12.dp, bottom = 6.dp)
+            if (pager.currentPage != -1 && !inLibrary && !drag.active && !liveDiscoverShowing) Column(Modifier.align(Alignment.BottomEnd).padding(end = 12.dp, bottom = 6.dp)
                 .width(preset.dockWidth.dp).graphicsLayer { translationX = discoverDockTranslation }, horizontalAlignment = Alignment.CenterHorizontally,
                 verticalArrangement = Arrangement.spacedBy(8.dp)) {
                 val controlSize = dockIconSize(geometry.iconSize).dp
@@ -1300,7 +1300,7 @@ private fun ExpandedWorkspace(
         if (showDiscover) {
             key("discover-pane") {
                 Box(Modifier.place(-viewportWidth).fillMaxSize()) {
-                    DiscoverContent(Modifier.fillMaxSize().padding(start = 16.dp, top = 16.dp, bottom = 16.dp))
+                    DiscoverContent(Modifier.fillMaxSize().padding(horizontal = 16.dp, vertical = 16.dp))
                 }
             }
         }
