@@ -21,6 +21,8 @@ import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.dp
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
 
 internal enum class CustomizationPage { OVERVIEW, WALLPAPER, HOME, GESTURES, BACKUP, HELP }
 
@@ -247,6 +249,8 @@ private fun HelpSection(icon: ImageVector, title: String, detail: String) {
     if (!p.dockAlignToGrid) CustomizationSlider("Dock height on screen", "${(p.dockPosition * 100).toInt()}%", p.dockPosition, .25f.. .75f) { model.setPreset(wide, p.copy(dockPosition = it)) }
     TextButton(onClick = { model.setPreset(wide, LayoutPreset()) }, Modifier.fillMaxWidth()) { Text("Reset this layout") }
     HorizontalDivider(Modifier.padding(vertical = 6.dp))
+    IconAppearanceSettings(state, model)
+    HorizontalDivider(Modifier.padding(vertical = 6.dp))
     Text("Widgets · Page ${homePage + 1}", style = MaterialTheme.typography.titleMedium)
     state.widgetPlacements.filter { it.page == homePage || (wide && it.page == -1) }.forEach { placement ->
         Row(Modifier.fillMaxWidth().heightIn(min = 48.dp), verticalAlignment = Alignment.CenterVertically) {
@@ -256,6 +260,40 @@ private fun HelpSection(icon: ImageVector, title: String, detail: String) {
         }
     }
     TextButton(onClick = { onAddWidget(homePage) }, Modifier.fillMaxWidth().heightIn(min = 48.dp)) { Text("Add widget to this page") }
+}
+
+@Composable private fun IconAppearanceSettings(state: LauncherState, model: LauncherModel) {
+    val context = androidx.compose.ui.platform.LocalContext.current
+    var packs by remember { mutableStateOf<List<IconPack>>(emptyList()) }
+    var loading by remember { mutableStateOf(true) }
+    var showPacks by remember { mutableStateOf(false) }
+    LaunchedEffect(context) {
+        packs = withContext(Dispatchers.IO) { IconPackCatalog.installed(context) }
+        loading = false
+    }
+    Text("Icons", style = MaterialTheme.typography.titleMedium)
+    Text("Choose an installed icon pack, or keep each app’s own icon. Icon shapes apply locally in Duo.",
+        style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+    FlowRow(horizontalArrangement = Arrangement.spacedBy(6.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+        IconShape.entries.forEach { shape ->
+            FilterChip(state.iconShape == shape, { model.setIconShape(shape) }, label = { Text(shape.label) })
+        }
+    }
+    OutlinedButton(onClick = { showPacks = true }, enabled = !loading,
+        modifier = Modifier.fillMaxWidth().heightIn(min = 48.dp).testTag("icon-pack-picker")) {
+        Icon(Icons.Rounded.Palette, null); Spacer(Modifier.width(8.dp))
+        Text(packs.firstOrNull { it.packageName == state.iconPackPackage }?.label ?: "System app icons")
+    }
+    if (showPacks) AlertDialog(onDismissRequest = { showPacks = false }, title = { Text("Icon pack") },
+        text = {
+            Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                TextButton(onClick = { model.setIconPack(null); showPacks = false }, Modifier.fillMaxWidth()) { Text("System app icons") }
+                if (packs.isEmpty()) Text("No compatible icon packs are installed.", style = MaterialTheme.typography.bodySmall)
+                packs.forEach { pack -> TextButton(onClick = { model.setIconPack(pack.packageName); showPacks = false }, Modifier.fillMaxWidth()) {
+                    Text(pack.label)
+                } }
+            }
+        }, confirmButton = { TextButton(onClick = { showPacks = false }) { Text("Close") } })
 }
 
 @Composable private fun SettingsSwitch(label: String, checked: Boolean, onChecked: (Boolean) -> Unit, tag: String? = null) {

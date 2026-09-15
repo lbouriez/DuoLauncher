@@ -56,6 +56,8 @@ data class LauncherState(
     val doubleTapToLock: Boolean = false,
     val compact: LayoutPreset = LayoutPreset(),
     val expanded: LayoutPreset = LayoutPreset(),
+    val iconPackPackage: String? = null,
+    val iconShape: IconShape = IconShape.ROUNDED_SQUARE,
     val labels: Boolean = true,
     val verticalStatus: Boolean = true,
     val loading: Boolean = true,
@@ -128,7 +130,8 @@ class LauncherModel(application: Application) : AndroidViewModel(application) {
         invalidatedPackages.clear()
         removedPackages.clear()
         val resources = getApplication<Application>().resources
-        val configuration = resources.configuration.let { "${it.densityDpi}|${it.locales.toLanguageTags()}|${it.uiMode}" }
+        val iconSettings = mutable.value.let { it.iconPackPackage to it.iconShape }
+        val configuration = resources.configuration.let { "${it.densityDpi}|${it.locales.toLanguageTags()}|${it.uiMode}|${iconSettings.first}|${iconSettings.second}" }
         viewModelScope.launch {
             try {
                 val apps = withContext(Dispatchers.IO) {
@@ -139,6 +142,7 @@ class LauncherModel(application: Application) : AndroidViewModel(application) {
                     } == true }
                     val collator = Collator.getInstance()
                     val application = getApplication<Application>()
+                    val iconPack = iconSettings.first?.let { IconPackCatalog.load(application, it) }
                     val personal = Process.myUserHandle()
                     val personalSerial = userManager.getSerialNumberForUser(personal)
                     val associatedSerials = userManager.userProfiles.mapTo(mutableSetOf(), userManager::getSerialNumberForUser)
@@ -156,7 +160,7 @@ class LauncherModel(application: Application) : AndroidViewModel(application) {
                         AppProfile(serial, if (isPersonal) "Personal" else "Work", isPersonal, !isPersonal,
                             quiet, unlocked, !quiet && unlocked)
                     }
-                    val cachedBeforeProfiles = loadCachedApps().filterNot { entry -> entry.userSerial to entry.packageName in removed }
+                    val cachedBeforeProfiles = loadCachedApps(iconPack, iconSettings.second).filterNot { entry -> entry.userSerial to entry.packageName in removed }
                     val removedProfileSerials = removedAssociatedProfileSerials(
                         cachedBeforeProfiles.filter(AppEntry::isWork).mapTo(mutableSetOf(), AppEntry::userSerial), associatedSerials)
                     val cached = cachedBeforeProfiles.filterNot { it.isWork && it.userSerial in removedProfileSerials }
@@ -173,7 +177,7 @@ class LauncherModel(application: Application) : AndroidViewModel(application) {
                             val label = info.label.toString()
                             iconCache[id]?.takeIf { it.label == label && it.available } ?: run {
                                 val icon = runCatching { info.getBadgedIcon(0) }.getOrElse { application.packageManager.defaultActivityIcon }
-                                AppEntry(id, label, launcherIcon(icon), component, profile, serial, descriptor.label,
+                                AppEntry(id, label, launcherIcon(iconPack?.drawableFor(component.flattenToString()) ?: icon, iconSettings.second), component, profile, serial, descriptor.label,
                                     descriptor.isWork, available = true).also { iconCache[id] = it }
                             }
                         }
@@ -235,7 +239,7 @@ class LauncherModel(application: Application) : AndroidViewModel(application) {
         }
     }
 
-    private fun loadCachedApps(): List<AppEntry> = runCatching {
+    private fun loadCachedApps(iconPack: IconPack?, shape: IconShape): List<AppEntry> = runCatching {
         val application = getApplication<Application>()
         val personal = Process.myUserHandle()
         val array = JSONArray(appCatalogPrefs.getString("apps", "[]"))
@@ -247,9 +251,11 @@ class LauncherModel(application: Application) : AndroidViewModel(application) {
             val serial = item.getLong("serial").takeIf { it >= 0 } ?: error("Invalid cached profile")
             val user = userManager.getUserForSerialNumber(serial) ?: personal
             val isWork = item.optBoolean("work", identity.userSerial != null)
-            val baseIcon = application.packageManager.defaultActivityIcon
-            val icon = runCatching { application.packageManager.getUserBadgedIcon(baseIcon, user) }.getOrDefault(baseIcon)
-            AppEntry(id, item.getString("label"), launcherIcon(icon), component, user, serial,
+            val baseIcon = runCatching { application.packageManager.getActivityIcon(component) }
+                .getOrDefault(application.packageManager.defaultActivityIcon)
+            val icon = iconPack?.drawableFor(component.flattenToString())
+                ?: runCatching { application.packageManager.getUserBadgedIcon(baseIcon, user) }.getOrDefault(baseIcon)
+            AppEntry(id, item.getString("label"), launcherIcon(icon, shape), component, user, serial,
                 item.optString("profile", if (isWork) "Work" else "Personal"), isWork, available = false)
         }
     }.getOrDefault(emptyList())
@@ -426,6 +432,14 @@ class LauncherModel(application: Application) : AndroidViewModel(application) {
     fun setGoogleSearch(value: Boolean) { if (statePayloadInvalid) return; undoLayout = null; undoImportSettings = null; mutable.update { it.copy(googleSearch = value, canUndoEdit = false) }; persist() }
     fun setDoubleTapToLock(value: Boolean) { if (statePayloadInvalid) return; undoLayout = null; undoImportSettings = null; mutable.update { it.copy(doubleTapToLock = value, canUndoEdit = false) }; persist() }
     fun setShowRecentApps(value: Boolean) { if (statePayloadInvalid) return; mutable.update { it.copy(showRecentApps = value) }; persist() }
+    fun setIconPack(packageName: String?) {
+        if (statePayloadInvalid) return
+        val validPackage = packageName?.takeIf { it.matches(Regex("[A-Za-z][A-Za-z0-9_]*(\\.[A-Za-z][A-Za-z0-9_]*)+")) }
+        if (packageName != null && validPackage == null) return
+        mutable.update { it.copy(iconPackPackage = validPackage) }
+        persist(); refresh()
+    }
+    fun setIconShape(shape: IconShape) { if (statePayloadInvalid) return; mutable.update { it.copy(iconShape = shape) }; persist(); refresh() }
     fun recordAppLaunch(appId: String) {
         if (appId.isBlank() || isFolderId(appId) || isReservedFolderId(appId)) return
         mutable.update { state -> state.copy(recentApps = (listOf(appId) + state.recentApps.filter { it != appId }).take(16)) }
@@ -493,6 +507,8 @@ class LauncherModel(application: Application) : AndroidViewModel(application) {
             .put("googleSearch", s.googleSearch)
             .put("doubleTapToLock", s.doubleTapToLock)
             .put("verticalStatus", s.verticalStatus)
+            .put("iconPackPackage", s.iconPackPackage)
+            .put("iconShape", s.iconShape.name)
             .put("compact", preset(s.compact)).put("expanded", preset(s.expanded))
         val editor = prefs.edit()
         if (legacyRaw != null && sourceSchema == 2 && !prefs.contains("state_v2_backup"))
@@ -635,7 +651,9 @@ class LauncherModel(application: Application) : AndroidViewModel(application) {
             googleSearch = j.optBoolean("googleSearch", true),
             doubleTapToLock = j.optBoolean("doubleTapToLock", false),
             labels = j.optBoolean("labels", true), compact = preset("compact", LayoutPreset()),
-            expanded = preset("expanded", LayoutPreset()), verticalStatus = j.optBoolean("verticalStatus", true))
+            expanded = preset("expanded", LayoutPreset()), verticalStatus = j.optBoolean("verticalStatus", true),
+            iconPackPackage = j.optString("iconPackPackage").takeIf { it.matches(Regex("[A-Za-z][A-Za-z0-9_]*(\\.[A-Za-z][A-Za-z0-9_]*)+")) },
+            iconShape = IconShape.fromStored(j.optString("iconShape")))
     }.getOrElse {
         statePayloadInvalid = legacyRaw != null
         LauncherState(loading = false, error = "Saved Home layout could not be read; it was left unchanged.")
@@ -645,13 +663,15 @@ class LauncherModel(application: Application) : AndroidViewModel(application) {
 }
 
 /** Render adaptive layers through our rounded-square mask, preserving original app artwork. */
-private fun launcherIcon(drawable: Drawable): Bitmap {
-    if (drawable !is AdaptiveIconDrawable) return drawable.toBitmap(144, 144)
+private fun launcherIcon(drawable: Drawable, shape: IconShape): Bitmap {
+    if (drawable !is AdaptiveIconDrawable && shape == IconShape.SQUARE) return drawable.toBitmap(144, 144)
     val bitmap = Bitmap.createBitmap(144, 144, Bitmap.Config.ARGB_8888)
     val canvas = Canvas(bitmap)
-    canvas.clipPath(Path().apply { addRoundRect(0f, 0f, 144f, 144f, 34f, 34f, Path.Direction.CW) })
+    canvas.clipPath(shape.path(144f))
     drawable.setBounds(0, 0, 144, 144)
-    drawable.background?.draw(canvas)
-    drawable.foreground?.draw(canvas)
+    if (drawable is AdaptiveIconDrawable) {
+        drawable.background?.draw(canvas)
+        drawable.foreground?.draw(canvas)
+    } else drawable.draw(canvas)
     return bitmap
 }
