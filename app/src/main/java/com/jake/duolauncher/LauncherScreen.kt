@@ -452,6 +452,7 @@ fun LauncherScreen(
                 }
             }
             val contentHeight = maxHeight
+            val fullPagerWidth = maxWidth
             val panelWidth = maxWidth - geometry.homeWidth.dp
             val pagerWidth = maxWidth - preset.dockWidth.dp - 28.dp
             val leftColumnOrigin = (maxWidth / 2f - geometry.gridWidth.dp) / 2f - 16.dp
@@ -470,7 +471,7 @@ fun LauncherScreen(
             // Live Discover hands off across the full launcher viewport, not the narrower
             // pager region. The dock must cover that same distance or the home surface slides
             // beneath it during the transition.
-            val discoverDockTranslation = with(density) { discoverTransition * maxWidth.toPx() }
+            val discoverDockTranslation = with(density) { discoverTransition * fullPagerWidth.toPx() }
             var gestureOriginInRoot by remember { mutableStateOf(Offset.Zero) }
             var gestureOriginInWindow by remember { mutableStateOf(Offset.Zero) }
             val pagerInputEnabled = pager.currentPage in -firstHome..visibleHomePages && !drag.active &&
@@ -503,7 +504,10 @@ fun LauncherScreen(
                 onDownwardSwipe = launcherActivity::openSystemShade,
                 onLeadingOverscroll = if (firstHome == 0) onDiscover else null,
             )) {
-            val pagerModifier = Modifier.fillMaxHeight().width(pagerWidth)
+            // Home layout already reserves room for the dock through its geometry. The pager
+            // itself must still span the launcher so the Discover handoff can move one canvas
+            // instead of clipping the home surface at the dock boundary.
+            val pagerModifier = Modifier.fillMaxHeight().width(fullPagerWidth)
                 .drawWithContent {
                     homeLayer.record { this@drawWithContent.drawContent() }
                     drawLayer(homeLayer)
