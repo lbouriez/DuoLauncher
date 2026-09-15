@@ -52,9 +52,9 @@ apkanalyzer="$sdk_root/cmdline-tools/latest/bin/apkanalyzer"
 }
 
 normalize_fingerprint() { tr -d ':[:space:]' | tr '[:lower:]' '[:upper:]'; }
-expected_fingerprint=$(keytool -list -v -keystore "$DUO_RELEASE_STORE_FILE" \
-    -storepass "$DUO_RELEASE_STORE_PASSWORD" -alias "$DUO_RELEASE_KEY_ALIAS" \
-    -keypass "$DUO_RELEASE_KEY_PASSWORD" 2>/dev/null \
+expected_fingerprint=$(keytool -exportcert -rfc -keystore "$DUO_RELEASE_STORE_FILE" \
+    -storepass "$DUO_RELEASE_STORE_PASSWORD" -alias "$DUO_RELEASE_KEY_ALIAS" 2>/dev/null \
+    | keytool -printcert 2>/dev/null \
     | sed -n 's/^[[:space:]]*SHA256:[[:space:]]*//p' | head -n 1 | normalize_fingerprint)
 [[ -n "$expected_fingerprint" ]] || { echo "Could not read the configured signing certificate." >&2; exit 1; }
 
@@ -67,6 +67,8 @@ apk_fingerprint=$(printf '%s\n' "$apk_certificate_output" \
     | sed -n 's/^Signer #1 certificate SHA-256 digest: //p' | head -n 1 | normalize_fingerprint)
 [[ "$apk_fingerprint" == "$expected_fingerprint" ]] || {
     echo "APK signer does not match the configured signing certificate." >&2
+    echo "Expected certificate SHA-256: $expected_fingerprint" >&2
+    echo "APK certificate SHA-256: $apk_fingerprint" >&2
     exit 1
 }
 
@@ -90,6 +92,8 @@ aab_fingerprint=$(keytool -printcert -jarfile "$aab" 2>/dev/null \
     | sed -n 's/^[[:space:]]*SHA256:[[:space:]]*//p' | head -n 1 | normalize_fingerprint)
 [[ "$aab_fingerprint" == "$expected_fingerprint" ]] || {
     echo "AAB signer does not match the configured signing certificate." >&2
+    echo "Expected certificate SHA-256: $expected_fingerprint" >&2
+    echo "AAB certificate SHA-256: $aab_fingerprint" >&2
     exit 1
 }
 
