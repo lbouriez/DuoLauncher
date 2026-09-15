@@ -51,6 +51,7 @@ data class LauncherState(
     val widgetPlacements: List<WidgetPlacement> = DEFAULT_WIDGET_PLACEMENTS,
     val widgetRestores: List<WidgetRestore> = emptyList(),
     val googleSearch: Boolean = true,
+    val doubleTapToLock: Boolean = false,
     val compact: LayoutPreset = LayoutPreset(),
     val expanded: LayoutPreset = LayoutPreset(),
     val labels: Boolean = true,
@@ -420,6 +421,7 @@ class LauncherModel(application: Application) : AndroidViewModel(application) {
     fun setLabels(value: Boolean) { if (statePayloadInvalid) return; undoLayout = null; undoImportSettings = null; mutable.update { it.copy(labels = value, canUndoEdit = false) }; persist() }
     fun setVerticalStatus(value: Boolean) { if (statePayloadInvalid) return; undoLayout = null; undoImportSettings = null; mutable.update { it.copy(verticalStatus = value, canUndoEdit = false) }; persist() }
     fun setGoogleSearch(value: Boolean) { if (statePayloadInvalid) return; undoLayout = null; undoImportSettings = null; mutable.update { it.copy(googleSearch = value, canUndoEdit = false) }; persist() }
+    fun setDoubleTapToLock(value: Boolean) { if (statePayloadInvalid) return; undoLayout = null; undoImportSettings = null; mutable.update { it.copy(doubleTapToLock = value, canUndoEdit = false) }; persist() }
     fun setPreset(expanded: Boolean, value: LayoutPreset) {
         if (statePayloadInvalid) return
         undoLayout = null; undoImportSettings = null
@@ -479,6 +481,7 @@ class LauncherModel(application: Application) : AndroidViewModel(application) {
             .put("folders", folders)
             .put("restores", restores)
             .put("googleSearch", s.googleSearch)
+            .put("doubleTapToLock", s.doubleTapToLock)
             .put("verticalStatus", s.verticalStatus)
             .put("compact", preset(s.compact)).put("expanded", preset(s.expanded))
         val editor = prefs.edit()
@@ -616,6 +619,7 @@ class LauncherModel(application: Application) : AndroidViewModel(application) {
             dock = loadedDock,
             widgetPlacements = placements, folders = folders, widgetRestores = restores,
             googleSearch = j.optBoolean("googleSearch", true),
+            doubleTapToLock = j.optBoolean("doubleTapToLock", false),
             labels = j.optBoolean("labels", true), compact = preset("compact", LayoutPreset()),
             expanded = preset("expanded", LayoutPreset()), verticalStatus = j.optBoolean("verticalStatus", true))
     }.getOrElse {

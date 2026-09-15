@@ -121,6 +121,7 @@ fun LauncherScreen(
     showFirstRun: Boolean = false,
     onFinishFirstRun: () -> Unit = {},
     onShadeSetup: () -> Unit = {},
+    onLockScreen: (() -> Unit)? = null,
 ) {
     var sheet by rememberSaveable { mutableStateOf("") }
     var widgetSlot by rememberSaveable { mutableIntStateOf(0) }
@@ -539,7 +540,11 @@ fun LauncherScreen(
                             onActions = { selectedId = it.id }, modifier = Modifier.fillMaxSize().padding(start = 16.dp, top = 16.dp, bottom = bottomSpace).testTag("library-page"),
                             drag = drag, page = visibleHomePages, onLaunchFrom = onLaunchFrom, onTurnOnWork = { model.turnOnWork(it) })
                     } else {
-                        Row(Modifier.fillMaxSize().testTag("home-surface")) {
+                        Row(Modifier.fillMaxSize().testTag("home-surface").then(
+                            if (state.doubleTapToLock && !drag.active && onLockScreen != null) Modifier.pointerInput(onLockScreen) {
+                                detectTapGestures(onDoubleTap = { onLockScreen() })
+                            } else Modifier
+                        )) {
                             HomePagePane(page, state, previewLayout.slots, previewLayout.leadingSlots, previewLayout.widgetPlacements, appsById, geometry, contentHeight,
                                 bottomSpace, widgets, drag, target, insertionTarget, showLargeWidget = false,
                                 onLaunch = onLaunchFrom, onActions = { selectedId = it.id },

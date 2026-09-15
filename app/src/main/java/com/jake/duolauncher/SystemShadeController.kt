@@ -47,6 +47,14 @@ class SystemShadeAccessibilityService : AccessibilityService() {
             else ShadeOpenResult.SERVICE_DISABLED
         }
 
+        internal fun lock(context: Context): ShadeOpenResult {
+            val service = instance.get()
+            if (service != null) return if (service.performGlobalAction(GLOBAL_ACTION_LOCK_SCREEN)) {
+                ShadeOpenResult.OPENED
+            } else ShadeOpenResult.ACTION_REJECTED
+            return if (isEnabled(context)) ShadeOpenResult.SERVICE_STARTING else ShadeOpenResult.SERVICE_DISABLED
+        }
+
         private fun isEnabled(context: Context): Boolean {
             val component = ComponentName(context, SystemShadeAccessibilityService::class.java)
             val manager = context.getSystemService(AccessibilityManager::class.java)

@@ -110,7 +110,8 @@ class MainActivity : ComponentActivity() {
                     onAppearanceClear = { cancelAppearanceLocation(); appearance.clearLocation(systemDark()) },
                     showFirstRun = showFirstRun.value,
                     onFinishFirstRun = ::finishFirstRun,
-                    onShadeSetup = ::showShadeSetup)
+                    onShadeSetup = ::showShadeSetup,
+                    onLockScreen = ::lockScreen)
             }
         }
         FoldRenderExperiment.attach(this)
@@ -221,6 +222,17 @@ class MainActivity : ComponentActivity() {
         if (!shadeSetupOwnsExternalUi) return
         shadeSetupOwnsExternalUi = false
         LiveDiscover.setExternalResultPending(this, "main", "shade-service-setup", false)
+    }
+
+    private fun lockScreen() {
+        when (SystemShadeAccessibilityService.lock(this)) {
+            ShadeOpenResult.OPENED -> Unit
+            ShadeOpenResult.SERVICE_DISABLED -> showShadeSetup()
+            ShadeOpenResult.SERVICE_STARTING -> Toast.makeText(this,
+                "Lock gesture is starting. Double tap again.", Toast.LENGTH_SHORT).show()
+            ShadeOpenResult.ACTION_REJECTED -> Toast.makeText(this,
+                "Android couldn’t lock the screen.", Toast.LENGTH_SHORT).show()
+        }
     }
 
     private fun ownGoogleSearchExternally() {
