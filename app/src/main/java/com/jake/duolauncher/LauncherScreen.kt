@@ -178,6 +178,19 @@ fun LauncherScreen(
             pageCount = { pageCount + firstHome })
     }
     val pager = remember(nativePager, firstHome) { LauncherPager(nativePager, firstHome) }
+    val libraryOwnsWindowFocus by remember(nativePager, firstHome, visibleHomePages) {
+        derivedStateOf {
+            nativePager.targetPage - firstHome == visibleHomePages || pager.currentPage == visibleHomePages
+        }
+    }
+    LaunchedEffect(libraryOwnsWindowFocus) {
+        // The persistent Discover activity otherwise remains the focused window above Main,
+        // which prevents Android from attaching the IME to All apps on some Fold builds.
+        LiveDiscover.setExternalResultPending(launcherActivity, "main", "all-apps", libraryOwnsWindowFocus)
+    }
+    DisposableEffect(launcherActivity) {
+        onDispose { LiveDiscover.setExternalResultPending(launcherActivity, "main", "all-apps", false) }
+    }
     fun leaveTemporaryWidgetPage() {
         val persistedPages = model.state.value.homePages
         if (pager.currentPage >= persistedPages)
@@ -1257,6 +1270,7 @@ private fun ExpandedWorkspace(
 ) {
     val density = LocalDensity.current
     val viewportWidth = motion.pageWidth
+    val viewportWidthDp = with(density) { viewportWidth.toDp() }
     val stride = motion.homeStride
     val initialHomeOrigin = with(density) { panelWidth.toPx() }
     val homePaneWidth = with(density) { (geometry.gridWidth + 16f).dp.toPx() }
@@ -1306,6 +1320,12 @@ private fun ExpandedWorkspace(
     }
 
     Box(Modifier.fillMaxSize().clipToBounds().testTag("expanded-workspace")) {
+        // The native Discover host can cover the complete unfolded display, but ordinary
+        // launcher pages own only the viewport before the persistent right dock. The pager
+        // moves by this same width; clipping here prevents both neighboring outer pages from
+        // peeking through behind the dock while Home is settled.
+        Box(Modifier.width(viewportWidthDp).fillMaxHeight().clipToBounds()
+            .testTag("expanded-page-viewport")) {
         if (showDiscover) {
             key("discover-pane") {
                 Box(Modifier.place(-viewportWidth).fillMaxSize()) {
@@ -1356,9 +1376,10 @@ private fun ExpandedWorkspace(
                             .padding(start = 16.dp, top = 16.dp, bottom = bottomSpace)
                             .testTag("library-page"),
                         drag = drag, page = visibleHomePages, onLaunchFrom = onLaunchFrom, onTurnOnWork = onTurnOnWork,
-                        requestSearchFocus = nativePager.currentPage - firstHome == visibleHomePages)
+                        requestSearchFocus = nativePager.settledPage - firstHome == visibleHomePages)
                 }
             }
+        }
         }
     }
 }

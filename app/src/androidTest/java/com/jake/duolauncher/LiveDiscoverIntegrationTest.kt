@@ -184,7 +184,8 @@ class LiveDiscoverIntegrationTest {
             await { progress() == 0f && !LiveDiscover.pagerOwnsMotion }
             SystemClock.sleep(300)
             assertSame("No task/window reconstruction between visits", host, LiveDiscover.host.get())
-            // Hidden native callbacks must not drag All apps back to Home.
+            // All apps temporarily owns window focus for its IME. Reattaching Discover after
+            // returning Home must not let hidden native callbacks drag the pager backward.
             repeat(3) {
                 // A relaxed quarter-page swipe, including a pause before lifting, must
                 // work with Google's real window still connected behind the workspace.

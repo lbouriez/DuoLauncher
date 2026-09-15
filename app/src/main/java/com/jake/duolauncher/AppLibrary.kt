@@ -7,6 +7,8 @@ import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.interaction.MutableInteractionSource
+import androidx.compose.foundation.interaction.PressInteraction
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
@@ -56,12 +58,28 @@ internal fun AppLibrary(
     var showWork by remember { mutableStateOf(false) }
     val listState = rememberLazyListState()
     val searchFocus = remember { FocusRequester() }
+    val searchInteractions = remember { MutableInteractionSource() }
     val keyboard = LocalSoftwareKeyboardController.current
     LaunchedEffect(requestSearchFocus, editing) {
         if (requestSearchFocus && !editing) {
+            // The caller closes the native Discover host as soon as navigation starts. Wait
+            // until the pager has settled before creating the editor input connection.
             delay(250)
             searchFocus.requestFocus()
+            delay(100)
             keyboard?.show()
+        }
+    }
+    LaunchedEffect(searchInteractions, editing) {
+        searchInteractions.interactions.collect { interaction ->
+            if (interaction is PressInteraction.Release && !editing) {
+                // A request made while the pager is moving can be rejected by Android. A field
+                // that is already focused will not emit another focus event, so retry from the
+                // user's actual tap without interfering with cursor placement.
+                searchFocus.requestFocus()
+                delay(100)
+                keyboard?.show()
+            }
         }
     }
     val selectedProfile = if (showWork) state.profiles.firstOrNull { it.isWork } else state.profiles.firstOrNull { it.isPersonal }
@@ -94,6 +112,7 @@ internal fun AppLibrary(
             OutlinedTextField(query, onQuery, Modifier.fillMaxWidth().padding(vertical = 12.dp).focusRequester(searchFocus)
                 .testTag(if (editing) "pin-search" else "library-search"),
                 placeholder = { Text("Search apps") }, singleLine = true, shape = RoundedCornerShape(16.dp),
+                interactionSource = searchInteractions,
                 leadingIcon = { Icon(Icons.Rounded.Search, null) },
                 trailingIcon = { if (query.isNotEmpty()) IconButton(onClick = { onQuery("") }) { Icon(Icons.Rounded.Close, "Clear search") } },
                 colors = if (glass) OutlinedTextFieldDefaults.colors(

@@ -122,6 +122,23 @@ class ExpandedWorkspaceIntegrationTest {
         compose.waitForIdle()
     }
 
+    @Test fun settledHomeHidesOuterPagesAndAllAppsKeepsItsOwnViewportAndFocus() {
+        ready()
+        compose.onNodeWithTag("discover-page").assertIsNotDisplayed()
+        compose.onNodeWithTag("library-page").assertIsNotDisplayed()
+
+        compose.onNodeWithTag("library-page-link").performClick()
+        waitForPage("All apps")
+        compose.waitUntil(5_000) {
+            runCatching { compose.onNodeWithTag("library-search").assertIsFocused() }.isSuccess
+        }
+        val library = compose.onNodeWithTag("library-page").fetchSemanticsNode().boundsInRoot
+        val viewport = compose.onNodeWithTag("expanded-page-viewport").fetchSemanticsNode().boundsInRoot
+        val dock = compose.onNodeWithTag("dock").fetchSemanticsNode().boundsInRoot
+        assertEquals(viewport.right, library.right, 2f)
+        assertTrue("All apps must stop before the persistent dock", library.right < dock.left)
+    }
+
     @Test fun expandedPagerShowsUniqueOverlappingPairsAndLongSwipesMoveOnePage() {
         ready(); val before = model().state.value.layout
         try {
@@ -303,9 +320,11 @@ class ExpandedWorkspaceIntegrationTest {
             compose.onNodeWithTag("library-page-link").performClick()
             waitForPage("All apps")
             val library = compose.onNodeWithTag("library-page").fetchSemanticsNode().boundsInRoot
-            val viewport = pager().fetchSemanticsNode().boundsInRoot
-            assertEquals("All apps reaches the pager's trailing edge", viewport.right, library.right, 2f)
-            assertTrue("All apps uses the full expanded pager apart from its content padding",
+            val viewport = compose.onNodeWithTag("expanded-page-viewport").fetchSemanticsNode().boundsInRoot
+            val dock = compose.onNodeWithTag("dock").fetchSemanticsNode().boundsInRoot
+            assertEquals("All apps reaches the dock-safe viewport's trailing edge", viewport.right, library.right, 2f)
+            assertTrue("All apps must not render underneath the unfolded dock", library.right < dock.left)
+            assertTrue("All apps uses the dock-safe viewport apart from its content padding",
                 library.width > viewport.width * .9f)
         } finally {
             shell("wm size ${originalSize ?: "reset"}")
