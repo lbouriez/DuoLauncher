@@ -579,6 +579,7 @@ fun LauncherScreen(
                     } else if (page == visibleHomePages) {
                         AppLibrary(state, libraryQuery, { libraryQuery = it }, onLaunch, model::setPinned,
                             onActions = { selectedId = it.id }, modifier = Modifier.width(pagerWidth).fillMaxHeight()
+                                .then(if (state.fullscreenLauncher) Modifier.windowInsetsPadding(WindowInsets.safeDrawing) else Modifier)
                                 .padding(start = 16.dp, top = 16.dp, bottom = bottomSpace).testTag("library-page"),
                             drag = drag, page = visibleHomePages, onLaunchFrom = onLaunchFrom, onTurnOnWork = { model.turnOnWork(it) },
                             requestSearchFocus = pager.settledPage == visibleHomePages)
@@ -1347,7 +1348,9 @@ private fun ExpandedWorkspace(
                 Box(Modifier.place((visibleHomePages - 1) * stride + viewportWidth).fillMaxSize()) {
                     AppLibrary(state, libraryQuery, onLibraryQuery, onLaunch, onPinned,
                         onActions = onActions,
-                        modifier = Modifier.fillMaxSize().padding(start = 16.dp, top = 16.dp, bottom = bottomSpace)
+                        modifier = Modifier.fillMaxSize()
+                            .then(if (state.fullscreenLauncher) Modifier.windowInsetsPadding(WindowInsets.safeDrawing) else Modifier)
+                            .padding(start = 16.dp, top = 16.dp, bottom = bottomSpace)
                             .testTag("library-page"),
                         drag = drag, page = visibleHomePages, onLaunchFrom = onLaunchFrom, onTurnOnWork = onTurnOnWork,
                         requestSearchFocus = nativePager.currentPage - firstHome == visibleHomePages)

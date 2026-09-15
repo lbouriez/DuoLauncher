@@ -106,7 +106,13 @@ internal class DiscoverFrame(private val activity: Activity, private val vertica
                         }
                     }
                     clipPath.rewind()
-                    clipPath.addRoundRect(left, 0f, right, height.toFloat(), 16*d, 16*d, Path.Direction.CW)
+                    // The embedded Google activity occupies the measured safe viewport, not the
+                    // whole display. Leaving its actual top/bottom bounds out of the cutout lets
+                    // this frame blur the exposed Duo wallpaper strips above and below it.
+                    val viewportTop = LiveDiscover.viewport.top.coerceIn(0, height)
+                    val viewportBottom = LiveDiscover.viewport.bottom.coerceIn(viewportTop, height)
+                    clipPath.addRoundRect(left, viewportTop.toFloat(), right, viewportBottom.toFloat(),
+                        16*d, 16*d, Path.Direction.CW)
                     val save = canvas.save()
                     canvas.clipOutPath(clipPath)
                     // The clip remains active when the blurred layer is composited, so the blur
