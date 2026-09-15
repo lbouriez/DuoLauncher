@@ -257,7 +257,7 @@ jobs:
             echo "Refusing to overwrite assets on existing release: $DUO_RELEASE_TAG" >&2
             exit 1
           fi
-          gh release create "$DUO_RELEASE_TAG" --target "$DUO_SOURCE_COMMIT" --draft \
+          gh release create "$DUO_RELEASE_TAG" --repo "$GITHUB_REPOSITORY" --target "$DUO_SOURCE_COMMIT" --draft \
             --title "DuoLauncher fork $DUO_VERSION_NAME ($DUO_VERSION_CODE)" \
             --notes "Verified signed fork build for commit $DUO_SOURCE_COMMIT. This is a draft and is not published automatically." \
             release-assets/*
