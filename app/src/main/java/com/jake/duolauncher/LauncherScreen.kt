@@ -379,20 +379,17 @@ fun LauncherScreen(
         }
     }
 
-    val launcherLayer = rememberGraphicsLayer()
-    DisposableEffect(launcherLayer) {
-        launcherLayer.compositingStrategy = androidx.compose.ui.graphics.layer.CompositingStrategy.Offscreen
-        LiveDiscover.homeLayer = launcherLayer
-        onDispose { if (LiveDiscover.homeLayer === launcherLayer) LiveDiscover.homeLayer = null }
+    val homeLayer = rememberGraphicsLayer()
+    DisposableEffect(homeLayer) {
+        homeLayer.compositingStrategy = androidx.compose.ui.graphics.layer.CompositingStrategy.Offscreen
+        LiveDiscover.homeLayer = homeLayer
+        onDispose { if (LiveDiscover.homeLayer === homeLayer) LiveDiscover.homeLayer = null }
     }
     var launcherBoundsInWindow by remember { mutableStateOf<androidx.compose.ui.geometry.Rect?>(null) }
     Box(Modifier.fillMaxSize().graphicsLayer {
-        // The feed frame reuses the complete launcher render target in another window.
+        // The feed frame reuses the pager's render nodes in another window. Give Main
+        // a complete render target so cross-window damage cannot erase stationary controls.
         compositingStrategy = androidx.compose.ui.graphics.CompositingStrategy.Offscreen
-    }.drawWithContent {
-        launcherLayer.record { this@drawWithContent.drawContent() }
-        drawLayer(launcherLayer)
-        LiveDiscover.host.get()?.invalidateFrame()
     }.onSizeChanged { LiveDiscover.fullSize = androidx.compose.ui.geometry.Size(it.width.toFloat(), it.height.toFloat()) }
         .onGloballyPositioned { launcherBoundsInWindow = it.boundsInWindow() }.testTag("launcher-root").homeDragInput(drag,
         enabled = sheet.isEmpty() && !showFirstRun && selectedId == null && resizeSlot == null && pager.currentPage >= 0,
@@ -488,14 +485,19 @@ fun LauncherScreen(
                 onDownwardSwipe = launcherActivity::openSystemShade,
                 onLeadingOverscroll = if (firstHome == 0) onDiscover else null,
             )) {
-            val pagerModifier = Modifier.fillMaxHeight().width(pagerWidth).testTag("app-pager")
+            val pagerModifier = Modifier.fillMaxHeight().width(pagerWidth)
+                .drawWithContent {
+                    homeLayer.record { this@drawWithContent.drawContent() }
+                    drawLayer(homeLayer)
+                    LiveDiscover.host.get()?.invalidateFrame()
+                }.testTag("app-pager")
                 .discoverSwipe(firstHome == 0 && pager.currentPage == 0 && !drag.active && sheet.isEmpty() &&
                     !showFirstRun && selectedId == null, onDiscover)
                 .onGloballyPositioned {
                     if (firstHome > 0) {
                         val bounds = it.boundsInWindow()
                         val root = launcherBoundsInWindow ?: bounds
-                        LiveDiscover.pagerOrigin = root.topLeft
+                        LiveDiscover.pagerOrigin = bounds.topLeft
                         LiveDiscover.prepare(launcherActivity,
                             android.graphics.Rect(root.left.toInt(), root.top.toInt(),
                                 root.right.toInt(), root.bottom.toInt()),
