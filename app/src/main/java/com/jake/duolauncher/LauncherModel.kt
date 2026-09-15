@@ -54,7 +54,6 @@ data class LauncherState(
     val widgetRestores: List<WidgetRestore> = emptyList(),
     val googleSearch: Boolean = true,
     val doubleTapToLock: Boolean = false,
-    val fullscreenLauncher: Boolean = false,
     val compact: LayoutPreset = LayoutPreset(),
     val expanded: LayoutPreset = LayoutPreset(),
     val iconPackPackage: String? = null,
@@ -432,7 +431,6 @@ class LauncherModel(application: Application) : AndroidViewModel(application) {
     fun setVerticalStatus(value: Boolean) { if (statePayloadInvalid) return; undoLayout = null; undoImportSettings = null; mutable.update { it.copy(verticalStatus = value, canUndoEdit = false) }; persist() }
     fun setGoogleSearch(value: Boolean) { if (statePayloadInvalid) return; undoLayout = null; undoImportSettings = null; mutable.update { it.copy(googleSearch = value, canUndoEdit = false) }; persist() }
     fun setDoubleTapToLock(value: Boolean) { if (statePayloadInvalid) return; undoLayout = null; undoImportSettings = null; mutable.update { it.copy(doubleTapToLock = value, canUndoEdit = false) }; persist() }
-    fun setFullscreenLauncher(value: Boolean) { if (statePayloadInvalid) return; mutable.update { it.copy(fullscreenLauncher = value) }; persist() }
     fun setShowRecentApps(value: Boolean) { if (statePayloadInvalid) return; mutable.update { it.copy(showRecentApps = value) }; persist() }
     fun setIconPack(packageName: String?) {
         if (statePayloadInvalid) return
@@ -508,7 +506,6 @@ class LauncherModel(application: Application) : AndroidViewModel(application) {
             .put("restores", restores)
             .put("googleSearch", s.googleSearch)
             .put("doubleTapToLock", s.doubleTapToLock)
-            .put("fullscreenLauncher", s.fullscreenLauncher)
             .put("verticalStatus", s.verticalStatus)
             .put("iconPackPackage", s.iconPackPackage)
             .put("iconShape", s.iconShape.name)
@@ -653,7 +650,6 @@ class LauncherModel(application: Application) : AndroidViewModel(application) {
             widgetPlacements = placements, folders = folders, widgetRestores = restores,
             googleSearch = j.optBoolean("googleSearch", true),
             doubleTapToLock = j.optBoolean("doubleTapToLock", false),
-            fullscreenLauncher = j.optBoolean("fullscreenLauncher", false),
             labels = j.optBoolean("labels", true), compact = preset("compact", LayoutPreset()),
             expanded = preset("expanded", LayoutPreset()), verticalStatus = j.optBoolean("verticalStatus", true),
             iconPackPackage = j.optString("iconPackPackage").takeIf { it.matches(Regex("[A-Za-z][A-Za-z0-9_]*(\\.[A-Za-z][A-Za-z0-9_]*)+")) },

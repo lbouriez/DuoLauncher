@@ -110,7 +110,6 @@ fun LauncherScreen(
     state: LauncherState, model: LauncherModel, widgets: WidgetController, homeRequests: Int,
     onLaunch: (AppEntry) -> Unit, onMakeDefault: () -> Unit, onAppInfo: (AppEntry) -> Unit,
     isDefaultHome: Boolean, deviceStatus: DeviceStatus, onStatusMode: (Boolean) -> Unit, onWallpaperPreview: () -> Unit,
-    onFullscreenMode: (Boolean) -> Unit = {},
     onDiscover: () -> Unit = {}, searchRequests: Int = 0,
     onChooseDock: (Int) -> Unit = {},
     onLaunchFrom: (AppEntry, android.graphics.Rect?) -> Unit = { app, _ -> onLaunch(app) },
@@ -265,7 +264,6 @@ fun LauncherScreen(
     }
     LaunchedEffect(pager.settledPage) { if (pager.settledPage != homePages) focus.clearFocus() }
     LaunchedEffect(state.verticalStatus) { onStatusMode(state.verticalStatus) }
-    LaunchedEffect(state.fullscreenLauncher) { onFullscreenMode(state.fullscreenLauncher) }
     LaunchedEffect(homeRequests) { if (homeRequests > 0) {
         // An app can pause Home after the destination is visible but before its settle completes.
         val page = pager.currentPage.takeIf { it in 0 until homePages }
@@ -420,9 +418,7 @@ fun LauncherScreen(
         onOpen = { sheet = "settings" },
     )) {
         DuneWallpaper()
-        BoxWithConstraints(Modifier.fillMaxSize().then(
-            if (state.fullscreenLauncher) Modifier else Modifier.windowInsetsPadding(WindowInsets.safeDrawing)
-        )) {
+        BoxWithConstraints(Modifier.fillMaxSize().windowInsetsPadding(WindowInsets.safeDrawing)) {
             val wide = maxWidth.value >= 650f
             val preset = if (wide) state.expanded else state.compact
             val density = LocalDensity.current
@@ -579,7 +575,6 @@ fun LauncherScreen(
                     } else if (page == visibleHomePages) {
                         AppLibrary(state, libraryQuery, { libraryQuery = it }, onLaunch, model::setPinned,
                             onActions = { selectedId = it.id }, modifier = Modifier.width(pagerWidth).fillMaxHeight()
-                                .then(if (state.fullscreenLauncher) Modifier.windowInsetsPadding(WindowInsets.safeDrawing) else Modifier)
                                 .padding(start = 16.dp, top = 16.dp, bottom = bottomSpace).testTag("library-page"),
                             drag = drag, page = visibleHomePages, onLaunchFrom = onLaunchFrom, onTurnOnWork = { model.turnOnWork(it) },
                             requestSearchFocus = pager.settledPage == visibleHomePages)
@@ -1349,7 +1344,6 @@ private fun ExpandedWorkspace(
                     AppLibrary(state, libraryQuery, onLibraryQuery, onLaunch, onPinned,
                         onActions = onActions,
                         modifier = Modifier.fillMaxSize()
-                            .then(if (state.fullscreenLauncher) Modifier.windowInsetsPadding(WindowInsets.safeDrawing) else Modifier)
                             .padding(start = 16.dp, top = 16.dp, bottom = bottomSpace)
                             .testTag("library-page"),
                         drag = drag, page = visibleHomePages, onLaunchFrom = onLaunchFrom, onTurnOnWork = onTurnOnWork,
