@@ -13,6 +13,7 @@ import androidx.activity.enableEdgeToEdge
 import androidx.compose.runtime.mutableStateOf
 import androidx.core.view.WindowCompat
 import androidx.core.view.WindowInsetsCompat
+import androidx.core.view.WindowInsetsControllerCompat
 import androidx.window.embedding.ActivityEmbeddingController
 import java.lang.ref.WeakReference
 
@@ -242,7 +243,12 @@ class LiveDiscoverActivity : ComponentActivity() {
         // independently touchable and non-focusable while the pager owns the gesture.
         window.addFlags(WindowManager.LayoutParams.FLAG_NOT_TOUCHABLE)
         vertical = org.json.JSONObject(getSharedPreferences("launcher", 0).getString("state", "{}") ?: "{}").optBoolean("verticalStatus", true)
-        if (vertical) WindowCompat.getInsetsController(window, window.decorView).hide(WindowInsetsCompat.Type.statusBars())
+        // Discover owns the entire host while it is onscreen. System bars remain reachable
+        // with an edge swipe, but do not leave launcher-coloured strips around Google's UI.
+        WindowCompat.getInsetsController(window, window.decorView).apply {
+            systemBarsBehavior = WindowInsetsControllerCompat.BEHAVIOR_SHOW_TRANSIENT_BARS_BY_SWIPE
+            hide(WindowInsetsCompat.Type.systemBars())
+        }
         setContentView(View(this))
         onBackPressedDispatcher.addCallback(this, object : androidx.activity.OnBackPressedCallback(true) {
             override fun handleOnBackPressed() { LiveDiscover.onHomeRequest?.invoke() }

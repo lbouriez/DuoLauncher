@@ -97,7 +97,7 @@ internal class DiscoverFrame(private val activity: Activity, private val vertica
                         }
                     }
                     clipPath.rewind()
-                    clipPath.addRoundRect(left, 0f, right, height.toFloat(), 16*d, 16*d, Path.Direction.CW)
+                    clipPath.addRect(left, 0f, right, height.toFloat(), Path.Direction.CW)
                     val save = canvas.save()
                     canvas.clipOutPath(clipPath)
                     val layer = LiveDiscover.homeLayer
