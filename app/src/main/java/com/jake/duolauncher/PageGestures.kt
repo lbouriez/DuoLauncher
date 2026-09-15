@@ -1,6 +1,7 @@
 package com.jake.duolauncher
 
 import androidx.compose.animation.core.animate
+import androidx.compose.animation.core.spring
 import androidx.compose.foundation.MutatePriority
 import androidx.compose.ui.input.pointer.util.VelocityTracker
 import androidx.compose.ui.input.pointer.util.addPointerInputChange
@@ -194,7 +195,9 @@ internal fun Modifier.onePageGestures(
                                             val startVisualOffset = visualOffset()
                                             val targetVisualOffset = motion?.offset(target.toFloat()) ?: target * stride()
                                             val distanceToPage = targetVisualOffset - startVisualOffset
-                                            animate(0f, distanceToPage, initialVelocity = (-velocity).coerceIn(-stride() * 5f, stride() * 5f)) { value, _ ->
+                                            animate(0f, distanceToPage,
+                                                initialVelocity = (-velocity).coerceIn(-stride() * 5f, stride() * 5f),
+                                                animationSpec = spring(dampingRatio = 0.92f, stiffness = 650f)) { value, _ ->
                                                 // Springs can overshoot the one-page bound. Base every
                                                 // frame on the pager's actual position so a rejected delta
                                                 // cannot become a persistent settling offset.
