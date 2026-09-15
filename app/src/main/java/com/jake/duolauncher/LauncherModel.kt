@@ -48,6 +48,8 @@ data class LauncherState(
     val editRevision: Int = 0,
     val canUndoEdit: Boolean = false,
     val dock: List<String?> = List(4) { null },
+    val recentApps: List<String> = emptyList(),
+    val showRecentApps: Boolean = true,
     val widgetPlacements: List<WidgetPlacement> = DEFAULT_WIDGET_PLACEMENTS,
     val widgetRestores: List<WidgetRestore> = emptyList(),
     val googleSearch: Boolean = true,
@@ -215,6 +217,7 @@ class LauncherModel(application: Application) : AndroidViewModel(application) {
                         old.widgetRestores, old.leadingSlots), removedIds)
                     old.copy(apps = entries, profiles = profiles, homeSlots = reconciled.slots, leadingSlots = reconciled.leadingSlots,
                         dock = reconciled.dock, folders = reconciled.folders,
+                        recentApps = old.recentApps.filter { it in entries.map(AppEntry::id) },
                         canUndoEdit = old.canUndoEdit && old.layout == reconciled, loading = false,
                         error = if (statePayloadInvalid) old.error else null)
                 }
@@ -422,6 +425,12 @@ class LauncherModel(application: Application) : AndroidViewModel(application) {
     fun setVerticalStatus(value: Boolean) { if (statePayloadInvalid) return; undoLayout = null; undoImportSettings = null; mutable.update { it.copy(verticalStatus = value, canUndoEdit = false) }; persist() }
     fun setGoogleSearch(value: Boolean) { if (statePayloadInvalid) return; undoLayout = null; undoImportSettings = null; mutable.update { it.copy(googleSearch = value, canUndoEdit = false) }; persist() }
     fun setDoubleTapToLock(value: Boolean) { if (statePayloadInvalid) return; undoLayout = null; undoImportSettings = null; mutable.update { it.copy(doubleTapToLock = value, canUndoEdit = false) }; persist() }
+    fun setShowRecentApps(value: Boolean) { if (statePayloadInvalid) return; mutable.update { it.copy(showRecentApps = value) }; persist() }
+    fun recordAppLaunch(appId: String) {
+        if (appId.isBlank() || isFolderId(appId) || isReservedFolderId(appId)) return
+        mutable.update { state -> state.copy(recentApps = (listOf(appId) + state.recentApps.filter { it != appId }).take(16)) }
+        persist()
+    }
     fun setPreset(expanded: Boolean, value: LayoutPreset) {
         if (statePayloadInvalid) return
         undoLayout = null; undoImportSettings = null
@@ -477,6 +486,7 @@ class LauncherModel(application: Application) : AndroidViewModel(application) {
             .put("sourceScope", restore.sourceScope)) } }
         val data = JSONObject().put("schema", 8).put("pinned", JSONArray(s.order)).put("homeSlots", JSONArray(s.homeSlots))
             .put("leadingSlots", JSONArray(s.leadingSlots)).put("dock", JSONArray(s.dock))
+            .put("recentApps", JSONArray(s.recentApps)).put("showRecentApps", s.showRecentApps)
             .put("widgets", widgets).put("labels", s.labels)
             .put("folders", folders)
             .put("restores", restores)
@@ -614,9 +624,13 @@ class LauncherModel(application: Application) : AndroidViewModel(application) {
                 require(placements.filter { it.id == NEEDS_BINDING_WIDGET }.map { it.slot }.toSet() == loaded.map { it.slot }.toSet())
             }
         } else emptyList()
+        val recentApps = (j.optJSONArray("recentApps") ?: JSONArray()).let { array ->
+            List(array.length()) { array.optString(it) }.filter { it.isNotBlank() && it != "null" }.distinct().take(16)
+        }
         LauncherState(homeSlots = if (schema in 2..5) migrateSchema5Apps(legacySlots) else legacySlots,
             leadingSlots = rawLeadingSlots,
             dock = loadedDock,
+            recentApps = recentApps, showRecentApps = j.optBoolean("showRecentApps", true),
             widgetPlacements = placements, folders = folders, widgetRestores = restores,
             googleSearch = j.optBoolean("googleSearch", true),
             doubleTapToLock = j.optBoolean("doubleTapToLock", false),

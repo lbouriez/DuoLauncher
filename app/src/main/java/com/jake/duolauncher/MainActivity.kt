@@ -277,6 +277,7 @@ class MainActivity : ComponentActivity() {
             val user = getSystemService(UserManager::class.java).getUserForSerialNumber(app.userSerial)
                 ?: throw IllegalStateException("Profile is unavailable")
             getSystemService(LauncherApps::class.java).startMainActivity(app.component, user, screenBounds(bounds), launchOptions(bounds))
+            model.recordAppLaunch(app.id)
         } catch (_: Exception) { Toast.makeText(this, "${app.label} is unavailable.", Toast.LENGTH_SHORT).show(); model.refresh() }
     }
 

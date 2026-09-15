@@ -575,6 +575,8 @@ fun LauncherScreen(
                     DockAppColumn(state.dock, previewLayout.dock, appsById, geometry.dockRowHeight,
                         dockIconSize(geometry.iconSize), drag, insertionTarget,
                         onLaunch = onLaunchFrom, onChoose = onChooseDock)
+                    DockRecents(visibleDockRecentIds(state, appsById.keys).mapNotNull(appsById::get), geometry.dockRowHeight,
+                        dockIconSize(geometry.iconSize), onLaunchFrom) { selectedId = it.id }
                 }
             }
             Column(Modifier.align(Alignment.BottomStart).width(pagerWidth).padding(start = 16.dp, bottom = 6.dp), horizontalAlignment = Alignment.CenterHorizontally) {
