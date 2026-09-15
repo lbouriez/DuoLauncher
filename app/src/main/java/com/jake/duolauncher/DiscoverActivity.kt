@@ -213,6 +213,7 @@ class DiscoverActivity : DiscoverPageActivity() {
                 ?: throw IllegalStateException("Profile is unavailable")
             getSystemService(LauncherApps::class.java).startMainActivity(
                 app.component, user, null, null)
+            model.recordAppLaunch(app.id)
         } catch (_: RuntimeException) { Toast.makeText(this, "${app.label} is unavailable.", Toast.LENGTH_SHORT).show() }
     }
 }
@@ -387,6 +388,9 @@ private fun DiscoverDock(state: LauncherState, status: DeviceStatus, fullSize: S
                 labelHeight = with(density) { 14.sp.toDp().value } + 6f, inLibrary = true,
                 homeBottomSpace = if (context.getSystemService(android.app.role.RoleManager::class.java)
                     .isRoleHeld(android.app.role.RoleManager.ROLE_HOME)) 44f else 88f)
+            val recents = visibleDockRecentIds(state, apps.keys).mapNotNull(apps::get)
+            val dockHeight = (geometry.dockHeight + if (recents.isEmpty()) 0f else 14f + geometry.dockRowHeight * recents.size)
+                .coerceAtMost((maxHeight.value - geometry.dockTop - 120f).coerceAtLeast(geometry.dockHeight))
             if (state.verticalStatus) StatusRail(status, Modifier.align(Alignment.TopEnd).padding(end = 12.dp)
                 .offset(y = geometry.contentTop.dp).width(preset.dockWidth.dp)
                 .onSizeChanged {
@@ -396,7 +400,7 @@ private fun DiscoverDock(state: LauncherState, status: DeviceStatus, fullSize: S
                 },
                 compact = maxHeight < 500.dp, iconSize = dockIconSize(geometry.iconSize).dp)
             Surface(Modifier.align(Alignment.TopEnd).padding(end = 12.dp).offset(y = geometry.dockTop.dp)
-                .width(preset.dockWidth.dp).height(geometry.dockHeight.dp).testTag("discover-dock"),
+                .width(preset.dockWidth.dp).height(dockHeight.dp).testTag("discover-dock"),
                 shape = RoundedCornerShape(30.dp), color = Glass.copy(alpha = .32f), border = BorderStroke(1.dp, Color.White.copy(alpha = .3f))) {
                 Column(Modifier.padding(vertical = 8.dp).verticalScroll(rememberScrollState()), horizontalAlignment = Alignment.CenterHorizontally) {
                     state.dock.forEachIndexed { index, id ->
@@ -409,6 +413,8 @@ private fun DiscoverDock(state: LauncherState, status: DeviceStatus, fullSize: S
                             else Icon(Icons.Rounded.Home, null, tint = Color.White)
                         }
                     }
+                    DockRecents(recents, geometry.dockRowHeight, dockIconSize(geometry.iconSize),
+                        onLaunch = { app, _ -> onLaunch(app) }, onActions = {})
                 }
             }
             Column(Modifier.align(Alignment.BottomEnd).padding(end = 12.dp, bottom = 12.dp).width(preset.dockWidth.dp), horizontalAlignment = Alignment.CenterHorizontally) {
