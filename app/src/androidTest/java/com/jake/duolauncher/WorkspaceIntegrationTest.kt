@@ -100,6 +100,28 @@ class WorkspaceIntegrationTest {
         }
     }
 
+    @Test fun enteringAllAppsFocusesSearchAndShowsKeyboard() {
+        check(android.os.Build.HARDWARE in listOf("ranchu", "goldfish"))
+        fun shell(command: String) = android.os.ParcelFileDescriptor.AutoCloseInputStream(
+            androidx.test.platform.app.InstrumentationRegistry.getInstrumentation().uiAutomation.executeShellCommand(command)
+        ).bufferedReader().use { it.readText().trim() }
+        fun imeVisible() = androidx.core.view.ViewCompat.getRootWindowInsets(compose.activity.window.decorView)
+            ?.isVisible(androidx.core.view.WindowInsetsCompat.Type.ime()) == true
+        val ime = shell("settings get secure show_ime_with_hard_keyboard")
+        val handwriting = shell("settings get secure stylus_handwriting_enabled")
+        try {
+            shell("settings put secure show_ime_with_hard_keyboard 1")
+            shell("settings put secure stylus_handwriting_enabled 0")
+            ready()
+            compose.onNodeWithTag("library-page-link").performClick()
+            compose.waitUntil(10_000) { page() == "All apps" && imeVisible() }
+            compose.onNodeWithTag("library-search").performTextInput("chrome")
+        } finally {
+            for ((key, value) in listOf("show_ime_with_hard_keyboard" to ime, "stylus_handwriting_enabled" to handwriting))
+                shell(if (value == "null") "settings delete secure $key" else "settings put secure $key $value")
+        }
+    }
+
     @Test fun dockCanBeRearrangedFromAllAppsWithoutOpeningItsPicker() {
         ready(); val before = model().state.value.layout
         try {

@@ -538,7 +538,8 @@ fun LauncherScreen(
                     } else if (page == visibleHomePages) {
                         AppLibrary(state, libraryQuery, { libraryQuery = it }, onLaunch, model::setPinned,
                             onActions = { selectedId = it.id }, modifier = Modifier.fillMaxSize().padding(start = 16.dp, top = 16.dp, bottom = bottomSpace).testTag("library-page"),
-                            drag = drag, page = visibleHomePages, onLaunchFrom = onLaunchFrom, onTurnOnWork = { model.turnOnWork(it) })
+                            drag = drag, page = visibleHomePages, onLaunchFrom = onLaunchFrom, onTurnOnWork = { model.turnOnWork(it) },
+                            requestSearchFocus = pager.settledPage == visibleHomePages)
                     } else {
                         Row(Modifier.fillMaxSize().testTag("home-surface").then(
                             if (state.doubleTapToLock && !drag.active && onLockScreen != null) Modifier.pointerInput(onLockScreen) {
@@ -1305,7 +1306,8 @@ private fun ExpandedWorkspace(
                         onActions = onActions,
                         modifier = Modifier.fillMaxSize().padding(start = 16.dp, top = 16.dp, bottom = bottomSpace)
                             .testTag("library-page"),
-                        drag = drag, page = visibleHomePages, onLaunchFrom = onLaunchFrom, onTurnOnWork = onTurnOnWork)
+                        drag = drag, page = visibleHomePages, onLaunchFrom = onLaunchFrom, onTurnOnWork = onTurnOnWork,
+                        requestSearchFocus = nativePager.currentPage - firstHome == visibleHomePages)
                 }
             }
         }

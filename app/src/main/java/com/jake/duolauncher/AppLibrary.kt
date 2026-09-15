@@ -20,10 +20,13 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.platform.LocalSoftwareKeyboardController
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -31,6 +34,7 @@ import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.semantics.onLongClick
 import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.layout.boundsInWindow
+import kotlinx.coroutines.delay
 
 @Composable
 internal fun AppLibrary(
@@ -40,6 +44,7 @@ internal fun AppLibrary(
     drag: HomeDragState? = null, page: Int? = null,
     onLaunchFrom: (AppEntry, android.graphics.Rect?) -> Unit = { app, _ -> onLaunch(app) },
     onTurnOnWork: (Long) -> Unit = {},
+    requestSearchFocus: Boolean = false,
 ) {
     val glass = !editing
     val palette = LocalDuoPalette.current
@@ -50,6 +55,15 @@ internal fun AppLibrary(
     val hasWork = state.profiles.any { it.isWork } || state.apps.any { it.isWork }
     var showWork by remember { mutableStateOf(false) }
     val listState = rememberLazyListState()
+    val searchFocus = remember { FocusRequester() }
+    val keyboard = LocalSoftwareKeyboardController.current
+    LaunchedEffect(requestSearchFocus, editing) {
+        if (requestSearchFocus && !editing) {
+            delay(250)
+            searchFocus.requestFocus()
+            keyboard?.show()
+        }
+    }
     val selectedProfile = if (showWork) state.profiles.firstOrNull { it.isWork } else state.profiles.firstOrNull { it.isPersonal }
     LaunchedEffect(showWork, selectedProfile?.available, selectedProfile?.quiet) {
         listState.scrollToItem(0)
@@ -77,7 +91,8 @@ internal fun AppLibrary(
                 FilterChip(selected = !showWork, onClick = { showWork = false }, label = { Text("Personal") })
                 FilterChip(selected = showWork, onClick = { showWork = true }, label = { Text("Work") })
             }
-            OutlinedTextField(query, onQuery, Modifier.fillMaxWidth().padding(vertical = 12.dp).testTag(if (editing) "pin-search" else "library-search"),
+            OutlinedTextField(query, onQuery, Modifier.fillMaxWidth().padding(vertical = 12.dp).focusRequester(searchFocus)
+                .testTag(if (editing) "pin-search" else "library-search"),
                 placeholder = { Text("Search apps") }, singleLine = true, shape = RoundedCornerShape(16.dp),
                 leadingIcon = { Icon(Icons.Rounded.Search, null) },
                 trailingIcon = { if (query.isNotEmpty()) IconButton(onClick = { onQuery("") }) { Icon(Icons.Rounded.Close, "Clear search") } },
