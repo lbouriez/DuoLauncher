@@ -461,6 +461,13 @@ fun LauncherScreen(
                 WorkspacePageMotion(firstHome, visibleHomePages, with(density) { pagerWidth.toPx() }, with(density) { homeStride.toPx() })
             } else null
             val dockScroll = rememberScrollState()
+            val discoverTransition by remember(nativePager, firstHome) {
+                derivedStateOf(structuralEqualityPolicy()) {
+                    (firstHome - nativePager.currentPage - nativePager.currentPageOffsetFraction)
+                        .coerceIn(0f, 1f)
+                }
+            }
+            val discoverDockTranslation = with(density) { discoverTransition * pagerWidth.toPx() }
             var gestureOriginInRoot by remember { mutableStateOf(Offset.Zero) }
             var gestureOriginInWindow by remember { mutableStateOf(Offset.Zero) }
             val pagerInputEnabled = pager.currentPage in -firstHome..visibleHomePages && !drag.active &&
@@ -575,7 +582,7 @@ fun LauncherScreen(
             }
             if (state.verticalStatus) StatusRail(deviceStatus,
                 Modifier.align(Alignment.TopEnd).padding(end = 12.dp).offset(y = geometry.contentTop.dp)
-                    .width(preset.dockWidth.dp).onSizeChanged {
+                    .width(preset.dockWidth.dp).graphicsLayer { translationX = discoverDockTranslation }.onSizeChanged {
                         // The normal rail's 20dp location slot and 3dp gap do not move the dock.
                         statusHeight = (with(density) { it.height.toDp().value } -
                             if (contentHeight < 500.dp) 0f else 23f).coerceAtLeast(0f)
@@ -583,7 +590,8 @@ fun LauncherScreen(
                 compact = contentHeight < 500.dp, iconSize = dockIconSize(geometry.iconSize).dp)
             Surface(Modifier.align(Alignment.TopEnd).padding(end = 12.dp).offset(y = geometry.dockTop.dp)
                 .width(preset.dockWidth.dp).height(geometry.dockHeight.dp).graphicsLayer {
-                    // Composite the stationary dock independently of the shared pager layer.
+                    // The dock follows the same leading-page motion as the home surface.
+                    translationX = discoverDockTranslation
                     compositingStrategy = androidx.compose.ui.graphics.CompositingStrategy.Offscreen
                 }.testTag("dock"),
                 shape = RoundedCornerShape(30.dp), color = Glass.copy(alpha = .32f),
@@ -617,7 +625,7 @@ fun LauncherScreen(
                 }
             }
             if (!inLibrary && !drag.active && !liveDiscoverShowing) Column(Modifier.align(Alignment.BottomEnd).padding(end = 12.dp, bottom = 6.dp)
-                .width(preset.dockWidth.dp), horizontalAlignment = Alignment.CenterHorizontally,
+                .width(preset.dockWidth.dp).graphicsLayer { translationX = discoverDockTranslation }, horizontalAlignment = Alignment.CenterHorizontally,
                 verticalArrangement = Arrangement.spacedBy(8.dp)) {
                 val controlSize = dockIconSize(geometry.iconSize).dp
                 if (pager.currentPage == -1) CircleControl(Icons.Rounded.ArrowForward, "Back to home", "discover-home", controlSize) { scope.launch { pager.animateScrollToPage(0) } }
