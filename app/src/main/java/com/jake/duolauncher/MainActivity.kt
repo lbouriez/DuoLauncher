@@ -25,6 +25,8 @@ import androidx.activity.result.contract.ActivityResultContracts
 import android.content.pm.PackageManager
 import android.location.LocationManager
 import android.os.CancellationSignal
+import android.view.View
+import android.view.WindowManager
 import androidx.core.content.ContextCompat
 import android.content.BroadcastReceiver
 import android.content.Context
@@ -466,8 +468,27 @@ class MainActivity : ComponentActivity() {
     private fun setFullscreenMode(fullscreen: Boolean) {
         val controller = WindowCompat.getInsetsController(window, window.decorView)
         controller.systemBarsBehavior = WindowInsetsControllerCompat.BEHAVIOR_SHOW_TRANSIENT_BARS_BY_SWIPE
-        if (fullscreen) controller.hide(WindowInsetsCompat.Type.systemBars())
-        else {
+        if (fullscreen) {
+            window.attributes = window.attributes.apply {
+                layoutInDisplayCutoutMode = WindowManager.LayoutParams.LAYOUT_IN_DISPLAY_CUTOUT_MODE_SHORT_EDGES
+            }
+            // Some OEM launchers continue to honor these legacy flags even when the compat
+            // controller's request is deferred until the next focus/frame callback.
+            @Suppress("DEPRECATION")
+            run {
+                window.decorView.systemUiVisibility = View.SYSTEM_UI_FLAG_IMMERSIVE_STICKY or
+                    View.SYSTEM_UI_FLAG_FULLSCREEN or View.SYSTEM_UI_FLAG_HIDE_NAVIGATION or
+                    View.SYSTEM_UI_FLAG_LAYOUT_STABLE or View.SYSTEM_UI_FLAG_LAYOUT_FULLSCREEN or
+                    View.SYSTEM_UI_FLAG_LAYOUT_HIDE_NAVIGATION
+            }
+            controller.hide(WindowInsetsCompat.Type.systemBars())
+            window.decorView.post { controller.hide(WindowInsetsCompat.Type.systemBars()) }
+        } else {
+            @Suppress("DEPRECATION")
+            run {
+                window.decorView.systemUiVisibility = View.SYSTEM_UI_FLAG_LAYOUT_STABLE or
+                    View.SYSTEM_UI_FLAG_LAYOUT_FULLSCREEN or View.SYSTEM_UI_FLAG_LAYOUT_HIDE_NAVIGATION
+            }
             controller.show(WindowInsetsCompat.Type.navigationBars())
             setStatusMode(model.state.value.verticalStatus)
         }

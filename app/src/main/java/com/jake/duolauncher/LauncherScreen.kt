@@ -413,7 +413,9 @@ fun LauncherScreen(
         },
         onFinish = { cancelled -> finishDrag(cancelled) })) {
         DuneWallpaper()
-        BoxWithConstraints(Modifier.fillMaxSize().windowInsetsPadding(WindowInsets.safeDrawing)) {
+        BoxWithConstraints(Modifier.fillMaxSize().then(
+            if (state.fullscreenLauncher) Modifier else Modifier.windowInsetsPadding(WindowInsets.safeDrawing)
+        )) {
             val wide = maxWidth.value >= 650f
             val preset = if (wide) state.expanded else state.compact
             val density = LocalDensity.current
