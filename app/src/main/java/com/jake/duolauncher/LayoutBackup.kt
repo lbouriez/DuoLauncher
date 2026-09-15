@@ -31,6 +31,7 @@ data class LayoutImportPreview(
     val labels: Boolean,
     val googleSearch: Boolean,
     val verticalStatus: Boolean,
+    val googleDiscover: Boolean = true,
 )
 
 fun layoutBackupScope(context: Context): String {
@@ -70,6 +71,7 @@ fun encodeLayoutBackup(state: LauncherState, widgetDescriptors: List<BackupWidge
         .put("homeSlots", JSONArray(state.homeSlots)).put("leadingSlots", JSONArray(state.leadingSlots))
         .put("dock", JSONArray(state.dock)).put("folders", folders).put("widgets", widgets)
         .put("labels", state.labels).put("googleSearch", state.googleSearch).put("verticalStatus", state.verticalStatus)
+        .put("googleDiscover", state.googleDiscover)
         .put("compact", preset(state.compact)).put("expanded", preset(state.expanded)).toString(2)
 }
 
@@ -186,11 +188,13 @@ fun decodeLayoutBackup(raw: String, currentApps: List<AppEntry>, currentProfiles
     val compact = preset("compact"); val expanded = preset("expanded")
     val labels = root.strictBoolean("labels"); val googleSearch = root.strictBoolean("googleSearch")
     val verticalStatus = root.strictBoolean("verticalStatus")
+    val googleDiscover = if (root.has("googleDiscover")) root.strictBoolean("googleDiscover") else true
     return LayoutImportPreview(layout, missing.toList(), profileIssues.toList(),
         appCount = (slots + leadingSlots).count { it != null && !isReservedFolderId(it) } +
             dock.count { it != null } + folders.sumOf { it.appIds.size },
         folderCount = folders.size, widgetCount = layout.widgetPlacements.size,
-        compact = compact, expanded = expanded, labels = labels, googleSearch = googleSearch, verticalStatus = verticalStatus)
+        compact = compact, expanded = expanded, labels = labels, googleSearch = googleSearch,
+        verticalStatus = verticalStatus, googleDiscover = googleDiscover)
 }
 
 internal fun validBackupPlacement(value: WidgetPlacement): Boolean {

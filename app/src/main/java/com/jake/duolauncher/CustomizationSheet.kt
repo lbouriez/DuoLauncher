@@ -31,7 +31,7 @@ internal fun CustomizationSheet(state: LauncherState, initiallyWide: Boolean, mo
     isDefaultHome: Boolean, page: CustomizationPage, onPage: (CustomizationPage) -> Unit,
     onMakeDefault: () -> Unit, onClose: () -> Unit, onEditPins: () -> Unit, onWidget: (Int) -> Unit,
     onAddWidget: (Int) -> Unit, onRemoveWidget: (Int) -> Unit, onWallpaperPreview: () -> Unit,
-    onExportLayout: () -> Unit, onImportLayout: () -> Unit,
+    onExportLayout: () -> Unit, onImportLayout: () -> Unit, onExportDiagnostics: () -> Unit,
     appearance: AppearanceState, onAppearanceMode: (AppearanceMode) -> Unit,
     onAppearanceManual: (String, Double, Double) -> Unit, onAppearanceDeviceLocation: () -> Unit,
     onAppearanceClear: () -> Unit, backgrounds: LauncherBackgroundController, homePage: Int = 0,
@@ -115,6 +115,9 @@ internal fun CustomizationSheet(state: LauncherState, initiallyWide: Boolean, mo
                 CustomizationPage.GESTURES -> {
                     SettingsSwitch("Show app names", state.labels, model::setLabels, "label-switch")
                     SettingsSwitch("Show status at upper right", state.verticalStatus, model::setVerticalStatus, "status-switch")
+                    SettingsSwitch("Show Google Discover page", state.googleDiscover, model::setGoogleDiscover, "google-discover-switch")
+                    Text("Turn this off if the installed Google app does not provide a compatible launcher feed.",
+                        style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                     SettingsSwitch("Search button opens Google", state.googleSearch, model::setGoogleSearch, "google-search-switch")
                     SettingsSwitch("Double tap empty Home space to lock", state.doubleTapToLock, model::setDoubleTapToLock, "double-tap-lock-switch")
                     SettingsSwitch("Show recent apps in dock", state.showRecentApps, model::setShowRecentApps, "dock-recents-switch")
@@ -131,6 +134,14 @@ internal fun CustomizationSheet(state: LauncherState, initiallyWide: Boolean, mo
                         Button(onClick = onImportLayout, Modifier.weight(1f).heightIn(min = 48.dp).testTag("layout-import")) { Text("Restore") }
                     }
                     Text("Restore shows a review before changing Home.", style = MaterialTheme.typography.bodySmall)
+                    HorizontalDivider(Modifier.padding(vertical = 8.dp))
+                    Text("Diagnostics", style = MaterialTheme.typography.titleMedium)
+                    Text("Save a bounded log of Duo and Google Discover connection events. It includes build, device, package, and signing-certificate identity, but not your app list or Home layout.",
+                        style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    OutlinedButton(onClick = onExportDiagnostics,
+                        modifier = Modifier.fillMaxWidth().heightIn(min = 48.dp).testTag("diagnostics-export")) {
+                        Text("Export diagnostic log")
+                    }
                 }
                 CustomizationPage.HELP -> LauncherHelp(
                     isDefaultHome = isDefaultHome,

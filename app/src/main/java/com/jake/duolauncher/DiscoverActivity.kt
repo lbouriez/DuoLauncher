@@ -73,6 +73,7 @@ import java.lang.ref.WeakReference
 class DuoApplication : Application() {
     override fun onCreate() {
         super.onCreate()
+        DiagnosticLog.initialize(this)
         DiscoverEmbedding.initialize(this)
         DiscoverBounds.initialize(this)
     }

@@ -171,10 +171,13 @@ fun LauncherScreen(
     val pendingNewPage = widgets.pendingPlacement?.page == homePages
     val visibleHomePages = homePages + if (drag.active || widgetSession != null || pendingNewPage) 1 else 0
     var expandedWorkspace by remember { mutableStateOf(false) }
-    val firstHome = if (DiscoverBounds.available) 1 else 0
+    val firstHome = if (state.googleDiscover && DiscoverBounds.available) 1 else 0
     val pageCount = visibleHomePages + 1
-    val nativePager = rememberPagerState(initialPage = savedPage.coerceIn(-firstHome, pageCount - 1) + firstHome, pageCount = { pageCount + firstHome })
-    val pager = remember(nativePager) { LauncherPager(nativePager, firstHome) }
+    val nativePager = key(firstHome) {
+        rememberPagerState(initialPage = savedPage.coerceIn(-firstHome, pageCount - 1) + firstHome,
+            pageCount = { pageCount + firstHome })
+    }
+    val pager = remember(nativePager, firstHome) { LauncherPager(nativePager, firstHome) }
     fun leaveTemporaryWidgetPage() {
         val persistedPages = model.state.value.homePages
         if (pager.currentPage >= persistedPages)
@@ -190,7 +193,10 @@ fun LauncherScreen(
         }
     }
     val pageGestures = remember(nativePager) { PageGestureLimits(nativePager) }
-    SideEffect { pageGestures.editing = drag.active || widgetSession != null || resizeSlot != null; LiveDiscover.allowNativeOpen = pager.currentPage == 0 && !drag.active && widgetSession == null && resizeSlot == null }
+    SideEffect { pageGestures.editing = drag.active || widgetSession != null || resizeSlot != null; LiveDiscover.allowNativeOpen = state.googleDiscover && pager.currentPage == 0 && !drag.active && widgetSession == null && resizeSlot == null }
+    LaunchedEffect(state.googleDiscover) {
+        LiveDiscover.setExternalResultPending(launcherActivity, "main", "discover-disabled", !state.googleDiscover)
+    }
     val pageFling = androidx.compose.foundation.pager.PagerDefaults.flingBehavior(nativePager, pagerSnapDistance = pageGestures)
     var nativeMotion by remember { mutableStateOf(false) }
     DisposableEffect(nativePager) {
@@ -289,7 +295,9 @@ fun LauncherScreen(
         val destination = if (drag.source?.target is DropTarget.Library) homePages else drag.originPage.coerceAtMost(homePages - 1)
         drag.clear(); scope.launch { pager.scrollToPage(destination) }
     } else if (selectedId != null) selectedId = null else { focus.clearFocus(); scope.launch { pager.animateScrollToPage(0) } } }
-    val openDiscover = { if (firstHome > 0) scope.launch { pager.animateScrollToPage(-1) } else onDiscover(); Unit }
+    val openDiscover = { if (state.googleDiscover) {
+        if (firstHome > 0) scope.launch { pager.animateScrollToPage(-1) } else onDiscover()
+    }; Unit }
     val openLibrary = { scope.launch { pager.animateScrollToPage(homePages) }; Unit }
 
     val dragWindowPage = if (expandedWorkspace && (drag.active || widgetSession != null)) pager.settledPage else pager.currentPage
@@ -509,7 +517,7 @@ fun LauncherScreen(
                     }
                 },
                 onDownwardSwipe = launcherActivity::openSystemShade,
-                onLeadingOverscroll = if (firstHome == 0) onDiscover else null,
+                onLeadingOverscroll = if (state.googleDiscover && firstHome == 0) onDiscover else null,
             )) {
             // Home layout already reserves room for the dock through its geometry. The pager
             // itself must still span the launcher so the Discover handoff can move one canvas
@@ -520,7 +528,7 @@ fun LauncherScreen(
                     drawLayer(homeLayer)
                     LiveDiscover.host.get()?.invalidateFrame()
                 }.testTag("app-pager")
-                .discoverSwipe(firstHome == 0 && pager.currentPage == 0 && !drag.active && sheet.isEmpty() &&
+                .discoverSwipe(state.googleDiscover && firstHome == 0 && pager.currentPage == 0 && !drag.active && sheet.isEmpty() &&
                     !showFirstRun && selectedId == null, onDiscover)
                 .onGloballyPositioned {
                     if (firstHome > 0) {
@@ -624,7 +632,7 @@ fun LauncherScreen(
                     Icon(Icons.Rounded.Home, null, Modifier.size(18.dp)); Spacer(Modifier.width(8.dp)); Text("Set as home app")
                 }
                 if (pager.currentPage != -1) Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.Center) {
-                    if (!drag.active) IconButton(onClick = openDiscover, Modifier.size(32.dp).testTag("discover-page-link")) {
+                    if (state.googleDiscover && !drag.active) IconButton(onClick = openDiscover, Modifier.size(32.dp).testTag("discover-page-link")) {
                         Icon(Icons.Rounded.Explore, "Discover", tint = Color.White.copy(alpha = .65f), modifier = Modifier.size(17.dp))
                     }
                     if (visibleHomePages <= 6) repeat(visibleHomePages) { index ->
@@ -687,6 +695,7 @@ fun LauncherScreen(
                             onRemoveWidget = widgets::remove,
                             onExportLayout = { sheet = ""; launcherActivity.backups.startExport() },
                             onImportLayout = { sheet = ""; launcherActivity.backups.startImport() },
+                            onExportDiagnostics = { sheet = ""; launcherActivity.diagnostics.export() },
                             appearance = appearance, onAppearanceMode = onAppearanceMode,
                             onAppearanceManual = onAppearanceManual, onAppearanceDeviceLocation = onAppearanceDeviceLocation,
                             onAppearanceClear = onAppearanceClear,
@@ -1784,6 +1793,10 @@ private fun SettingsPanel(state: LauncherState, initiallyWide: Boolean, model: L
         }
         Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
             Text("Status at upper right", Modifier.weight(1f)); Switch(state.verticalStatus, model::setVerticalStatus, Modifier.testTag("status-switch"))
+        }
+        Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+            Text("Show Google Discover page", Modifier.weight(1f))
+            Switch(state.googleDiscover, model::setGoogleDiscover, Modifier.testTag("google-discover-switch"))
         }
         Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
             Text("Search button opens Google", Modifier.weight(1f))

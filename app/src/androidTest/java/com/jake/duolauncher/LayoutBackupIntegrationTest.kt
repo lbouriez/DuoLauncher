@@ -32,6 +32,7 @@ class LayoutBackupIntegrationTest {
             AppProfile(42, "Work", false, true, false, true, true)),
             homeSlots = listOf(null, null, workId), widgetPlacements = listOf(placement),
             widgetRestores = listOf(restore), loading = false), emptyList(), "origin-scope")
+        assertTrue(JSONObject(exported).getBoolean("googleDiscover"))
 
         val same = decodeLayoutBackup(exported, listOf(app), listOf(
             AppProfile(0, "Personal", true, false, false, true, true),
@@ -48,7 +49,8 @@ class LayoutBackupIntegrationTest {
             dock = foreign.layout.dock, folders = foreign.layout.folders,
             widgetPlacements = foreign.layout.widgetPlacements, widgetRestores = foreign.layout.widgetRestores,
             compact = foreign.compact, expanded = foreign.expanded, labels = foreign.labels,
-            googleSearch = foreign.googleSearch, verticalStatus = foreign.verticalStatus, loading = false),
+            googleDiscover = foreign.googleDiscover, googleSearch = foreign.googleSearch,
+            verticalStatus = foreign.verticalStatus, loading = false),
             emptyList(), "destination-scope")
         assertEquals("origin-scope", JSONObject(reexport).getJSONArray("widgets").getJSONObject(0).getString("sourceScope"))
         icon.recycle()
@@ -60,13 +62,15 @@ class LayoutBackupIntegrationTest {
         val oldWidgetIds = before.widgetPlacements.map { it.id }.filter { it >= 0 }.toSet()
         val preview = LayoutImportPreview(before.layout.copy(widgetPlacements = emptyList(), widgetRestores = emptyList()),
             emptyList(), emptyList(), before.homeSlots.filterNotNull().size, before.folders.size, 0,
-            before.compact, before.expanded, !before.labels, !before.googleSearch, !before.verticalStatus)
+            before.compact, before.expanded, !before.labels, !before.googleSearch, !before.verticalStatus,
+            googleDiscover = !before.googleDiscover)
         try {
             compose.runOnIdle { assertTrue(model().applyImportedLayout(preview)) }
             assertTrue(oldWidgetIds.all { it in model().retainedWidgetIds })
             compose.runOnIdle { assertTrue(model().undoEdit()) }
             assertEquals(before.layout, model().state.value.layout)
             assertEquals(before.labels, model().state.value.labels)
+            assertEquals(before.googleDiscover, model().state.value.googleDiscover)
             assertEquals(before.googleSearch, model().state.value.googleSearch)
             assertEquals(before.verticalStatus, model().state.value.verticalStatus)
         } finally {
@@ -74,6 +78,7 @@ class LayoutBackupIntegrationTest {
                 if (model().state.value.canUndoEdit) model().undoEdit()
                 model().restoreLayout(before.layout)
                 model().setLabels(before.labels)
+                model().setGoogleDiscover(before.googleDiscover)
                 model().setGoogleSearch(before.googleSearch)
                 model().setVerticalStatus(before.verticalStatus)
             }

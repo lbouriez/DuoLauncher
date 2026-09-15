@@ -24,6 +24,9 @@ Discover requires the installed Google app plus device support for Duo's embeddi
 - Choose **Open Google** to check whether the Google app itself can show content.
 - Choose **Back to Home**, press Back, or use the return arrow to leave Discover.
 - If **Open Google** is absent, the Google app has no launchable activity available to Duo.
+- In **Customize launcher → Gestures & search**, turn off **Show Google Discover page** to remove the page, compass button, and swipe gesture when the feed is not usable.
+
+To capture connection details, open **Customize launcher → Backup → Export diagnostic log** after reproducing the problem. The bounded text log includes Duo's package/version, whether the APK is debuggable, the signing-certificate fingerprint, device/Android identity, Google app version, and Discover connection events. It does not include your installed-app list or Home layout. Review it before sharing; Duo never uploads it automatically.
 
 A recovery screen proves that Duo can return safely; it does not prove that the device supports the live embedded feed. A short swipe that begins inside Google's feed can also rebound because Google owns that gesture. Try a deliberate swipe, the Duo-owned dock or rail, or the return arrow.
 

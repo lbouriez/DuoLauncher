@@ -44,6 +44,12 @@ internal class DiscoverClient(
     fun connect() {
         if (activity.isDestroyed || activity.isFinishing) return
         disconnect()
+        val googleVersion = runCatching {
+            val info = activity.packageManager.getPackageInfo(GOOGLE_PACKAGE, 0)
+            "${info.versionName}/${info.longVersionCode}"
+        }.getOrDefault("unavailable")
+        DiagnosticLog.event("discover", "connect_requested",
+            "package=${activity.packageName} pagerDriven=$pagerDriven googleVersion=$googleVersion")
         onState("Connecting to Discover…")
         val attempt = generation
         val callback = object : Binder() {
@@ -89,9 +95,11 @@ internal class DiscoverClient(
         val binding = object : ServiceConnection {
             override fun onServiceConnected(name: ComponentName, service: IBinder) {
                 if (generation != attempt) return
+                val descriptor = runCatching { service.interfaceDescriptor }.getOrNull()
+                DiagnosticLog.event("discover", "service_connected", "component=${name.flattenToShortString()} descriptor=$descriptor")
                 // A rejected or stale Google binding can accept one-way transactions without
                 // supplying the overlay interface. Show recovery instead of waiting for callbacks.
-                if (runCatching { service.interfaceDescriptor }.getOrNull() != OVERLAY) {
+                if (descriptor != OVERLAY) {
                     failed("Google didn't accept the feed connection. Restart Google, then retry.", attempt)
                     return
                 }
@@ -125,27 +133,42 @@ internal class DiscoverClient(
             }
             override fun onServiceDisconnected(name: ComponentName) {
                 if (generation == attempt) {
+                    DiagnosticLog.event("discover", "service_disconnected", "component=${name.flattenToShortString()}")
                     remote = null; ready = false; openRequested = false; dismissal.suspend()
                     onState("Discover disconnected. Tap Retry to reconnect.")
                 }
             }
-            override fun onNullBinding(name: ComponentName) { failed("The Google app did not provide a feed.", attempt) }
-            override fun onBindingDied(name: ComponentName) { failed("Discover disconnected. Tap Retry to reconnect.", attempt) }
+            override fun onNullBinding(name: ComponentName) {
+                DiagnosticLog.event("discover", "null_binding", "component=${name.flattenToShortString()}")
+                failed("Google declined the launcher feed connection. Restart the Google app or reboot, then retry; otherwise disable Discover in Duo settings.", attempt)
+            }
+            override fun onBindingDied(name: ComponentName) {
+                DiagnosticLog.event("discover", "binding_died", "component=${name.flattenToShortString()}")
+                failed("Discover disconnected. Tap Retry to reconnect.", attempt)
+            }
         }
         val intent = overlayIntent(activity)
         if (intent == null) {
+            DiagnosticLog.event("discover", "service_unavailable")
             onState("The installed Google app doesn't provide a compatible Discover feed.")
             return
         }
         try {
-            if (activity.bindService(intent, binding, Context.BIND_AUTO_CREATE)) connection = binding
-            else onState("Install or enable the Google app to use Discover.")
+            if (activity.bindService(intent, binding, Context.BIND_AUTO_CREATE)) {
+                connection = binding
+                DiagnosticLog.event("discover", "bind_started", "component=${intent.component?.flattenToShortString()}")
+            } else {
+                DiagnosticLog.event("discover", "bind_rejected")
+                onState("Install or enable the Google app to use Discover.")
+            }
         } catch (e: RuntimeException) {
+            DiagnosticLog.event("discover", "bind_exception", "type=${e.javaClass.simpleName}")
             Log.w(TAG, "Cannot bind Discover", e)
             onState("The Google app couldn't connect to Discover.")
         }
         handler.postDelayed({
             if (generation == attempt && connection != null && !(if (pagerDriven) ready else everVisible)) {
+                DiagnosticLog.event("discover", "connection_timeout", "ready=$ready everVisible=$everVisible")
                 disconnect()
                 onState("Discover is taking a while. You can retry or open Google.")
             }
@@ -230,6 +253,7 @@ internal class DiscoverClient(
     }
     private fun failed(message: String, attempt: Int) {
         if (generation != attempt) return
+        DiagnosticLog.event("discover", "connection_failed", message)
         disconnect(); onState(message)
     }
 

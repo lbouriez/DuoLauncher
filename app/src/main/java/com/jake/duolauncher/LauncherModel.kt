@@ -52,6 +52,7 @@ data class LauncherState(
     val showRecentApps: Boolean = true,
     val widgetPlacements: List<WidgetPlacement> = DEFAULT_WIDGET_PLACEMENTS,
     val widgetRestores: List<WidgetRestore> = emptyList(),
+    val googleDiscover: Boolean = true,
     val googleSearch: Boolean = true,
     val doubleTapToLock: Boolean = false,
     val compact: LayoutPreset = LayoutPreset(),
@@ -73,7 +74,7 @@ class LauncherModel(application: Application) : AndroidViewModel(application) {
     private data class RefreshedApps(val entries: List<AppEntry>, val profiles: List<AppProfile>,
         val authoritativeProfiles: Set<Long>, val removedProfiles: Set<Long>)
     private data class UndoImportSettings(val compact: LayoutPreset, val expanded: LayoutPreset, val labels: Boolean,
-        val googleSearch: Boolean, val verticalStatus: Boolean)
+        val googleDiscover: Boolean, val googleSearch: Boolean, val verticalStatus: Boolean)
     private val prefs = application.getSharedPreferences("launcher", 0)
     private val launcherApps = application.getSystemService(LauncherApps::class.java)
     private val userManager = application.getSystemService(UserManager::class.java)
@@ -372,13 +373,15 @@ class LauncherModel(application: Application) : AndroidViewModel(application) {
         if (statePayloadInvalid) return false
         val old = mutable.value
         if (old.layout == preview.layout && old.compact == preview.compact && old.expanded == preview.expanded &&
-            old.labels == preview.labels && old.googleSearch == preview.googleSearch && old.verticalStatus == preview.verticalStatus) return false
+            old.labels == preview.labels && old.googleDiscover == preview.googleDiscover &&
+            old.googleSearch == preview.googleSearch && old.verticalStatus == preview.verticalStatus) return false
         undoLayout = old.layout to preview.layout
-        undoImportSettings = UndoImportSettings(old.compact, old.expanded, old.labels, old.googleSearch, old.verticalStatus)
+        undoImportSettings = UndoImportSettings(old.compact, old.expanded, old.labels, old.googleDiscover, old.googleSearch, old.verticalStatus)
         mutable.value = old.copy(homeSlots = preview.layout.slots, leadingSlots = preview.layout.leadingSlots, dock = preview.layout.dock,
             widgetPlacements = preview.layout.widgetPlacements, folders = preview.layout.folders,
             widgetRestores = preview.layout.widgetRestores, compact = preview.compact, expanded = preview.expanded,
-            labels = preview.labels, googleSearch = preview.googleSearch, verticalStatus = preview.verticalStatus,
+            labels = preview.labels, googleDiscover = preview.googleDiscover,
+            googleSearch = preview.googleSearch, verticalStatus = preview.verticalStatus,
             editRevision = old.editRevision + 1, canUndoEdit = true)
         persist()
         return true
@@ -419,6 +422,7 @@ class LauncherModel(application: Application) : AndroidViewModel(application) {
             dock = before.dock.map { it?.takeIf(installed::contains) }, widgetPlacements = before.widgetPlacements, folders = before.folders,
             widgetRestores = before.widgetRestores, compact = settings?.compact ?: old.compact,
             expanded = settings?.expanded ?: old.expanded, labels = settings?.labels ?: old.labels,
+            googleDiscover = settings?.googleDiscover ?: old.googleDiscover,
             googleSearch = settings?.googleSearch ?: old.googleSearch, verticalStatus = settings?.verticalStatus ?: old.verticalStatus,
             canUndoEdit = false,
             editRevision = old.editRevision + 1)
@@ -429,6 +433,7 @@ class LauncherModel(application: Application) : AndroidViewModel(application) {
     }
     fun setLabels(value: Boolean) { if (statePayloadInvalid) return; undoLayout = null; undoImportSettings = null; mutable.update { it.copy(labels = value, canUndoEdit = false) }; persist() }
     fun setVerticalStatus(value: Boolean) { if (statePayloadInvalid) return; undoLayout = null; undoImportSettings = null; mutable.update { it.copy(verticalStatus = value, canUndoEdit = false) }; persist() }
+    fun setGoogleDiscover(value: Boolean) { if (statePayloadInvalid) return; undoLayout = null; undoImportSettings = null; mutable.update { it.copy(googleDiscover = value, canUndoEdit = false) }; persist() }
     fun setGoogleSearch(value: Boolean) { if (statePayloadInvalid) return; undoLayout = null; undoImportSettings = null; mutable.update { it.copy(googleSearch = value, canUndoEdit = false) }; persist() }
     fun setDoubleTapToLock(value: Boolean) { if (statePayloadInvalid) return; undoLayout = null; undoImportSettings = null; mutable.update { it.copy(doubleTapToLock = value, canUndoEdit = false) }; persist() }
     fun setShowRecentApps(value: Boolean) { if (statePayloadInvalid) return; mutable.update { it.copy(showRecentApps = value) }; persist() }
@@ -504,6 +509,7 @@ class LauncherModel(application: Application) : AndroidViewModel(application) {
             .put("widgets", widgets).put("labels", s.labels)
             .put("folders", folders)
             .put("restores", restores)
+            .put("googleDiscover", s.googleDiscover)
             .put("googleSearch", s.googleSearch)
             .put("doubleTapToLock", s.doubleTapToLock)
             .put("verticalStatus", s.verticalStatus)
@@ -648,6 +654,7 @@ class LauncherModel(application: Application) : AndroidViewModel(application) {
             dock = loadedDock,
             recentApps = recentApps, showRecentApps = j.optBoolean("showRecentApps", true),
             widgetPlacements = placements, folders = folders, widgetRestores = restores,
+            googleDiscover = j.optBoolean("googleDiscover", true),
             googleSearch = j.optBoolean("googleSearch", true),
             doubleTapToLock = j.optBoolean("doubleTapToLock", false),
             labels = j.optBoolean("labels", true), compact = preset("compact", LayoutPreset()),

@@ -41,6 +41,21 @@ class DiscoverIntegrationTest {
         for (slot in 0..3) compose.onNodeWithTag("dock-slot-$slot").assertIsDisplayed()
     }
 
+    @Test fun disabledDiscoverRemovesItsPageButtonAndSwipe() {
+        ready()
+        val original = model().state.value.googleDiscover
+        try {
+            compose.runOnIdle { model().setGoogleDiscover(false) }
+            compose.onNodeWithTag("discover-page-link").assertDoesNotExist()
+            val pager = compose.onNodeWithTag("app-pager")
+            pager.performTouchInput { swipeRight() }
+            assertPage("Home page 1 of 1")
+            assertFalse(model().state.value.googleDiscover)
+        } finally {
+            compose.runOnIdle { model().setGoogleDiscover(original) }
+        }
+    }
+
     @Test fun heldEntryShowsBothPagesAndReversalCancels() {
         ready()
         val priorMessage = LiveDiscover.message.value

@@ -35,6 +35,8 @@ class MainActivity : ComponentActivity() {
     private lateinit var widgets: WidgetController
     internal lateinit var backups: BackupController
         private set
+    internal lateinit var diagnostics: DiagnosticLogController
+        private set
     internal lateinit var backgrounds: LauncherBackgroundController
         private set
     private val homeRequests = mutableIntStateOf(0)
@@ -88,6 +90,9 @@ class MainActivity : ComponentActivity() {
         backups = BackupController(this, model, widgets) { active ->
             LiveDiscover.setExternalResultPending(this, "main", "layout-backup", active)
         }.also { it.restore() }
+        diagnostics = DiagnosticLogController(this) { active ->
+            LiveDiscover.setExternalResultPending(this, "main", "diagnostic-export", active)
+        }
         backgrounds = LauncherBackgroundController(this) { active ->
             LiveDiscover.setExternalResultPending(this, "main", "launcher-background", active)
         }
@@ -384,7 +389,9 @@ class MainActivity : ComponentActivity() {
     }
 
     private fun updateDefaultHome() {
-        defaultHome.value = getSystemService(RoleManager::class.java).isRoleHeld(RoleManager.ROLE_HOME)
+        val held = getSystemService(RoleManager::class.java).isRoleHeld(RoleManager.ROLE_HOME)
+        if (defaultHome.value != held) DiagnosticLog.event("home", "default_role_changed", "held=$held")
+        defaultHome.value = held
     }
 
     private fun systemDark() = resources.configuration.uiMode and android.content.res.Configuration.UI_MODE_NIGHT_MASK ==

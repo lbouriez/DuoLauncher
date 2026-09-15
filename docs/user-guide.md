@@ -22,8 +22,8 @@ Long press an empty Home cell to open **Add to Home**, then choose **Widgets**, 
 
 - **Wallpaper & appearance** for launcher photos, Android wallpaper, and color mode.
 - **Home layout** for icon size, row spacing, dock geometry, Home apps, and widgets on the visible page.
-- **Gestures & search** for app names, the upper-right status display, and Google search behavior.
-- **Backup** to save or restore the layout.
+- **Gestures & search** for app names, the upper-right status display, Discover, and Google search behavior.
+- **Backup** to save or restore the layout, or export a diagnostic log.
 - **Help & setup** for Home selection, widgets, shade gestures, and Discover.
 
 After a layout edit, **Undo last layout change** appears in customization. It covers the latest supported layout change, so use it before making another edit.
