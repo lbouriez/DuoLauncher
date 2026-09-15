@@ -58,6 +58,7 @@ internal class DiscoverFrame(private val activity: Activity, private val vertica
         if (view != null || activity.isDestroyed) return
         val frame = object : View(activity) {
             private val painter = CanvasDrawScope()
+            private val clipPath = Path()
             private val border = Paint(Paint.ANTI_ALIAS_FLAG).apply {
                 color = 0x66ffffff; style = Paint.Style.STROKE; strokeWidth = resources.displayMetrics.density
             }
@@ -95,9 +96,10 @@ internal class DiscoverFrame(private val activity: Activity, private val vertica
                                     "layer=${layer?.size} matrix=${values.contentToString()}")
                         }
                     }
-                    val shape = Path().apply { addRoundRect(left, 0f, right, height.toFloat(), 16*d, 16*d, Path.Direction.CW) }
+                    clipPath.rewind()
+                    clipPath.addRoundRect(left, 0f, right, height.toFloat(), 16*d, 16*d, Path.Direction.CW)
                     val save = canvas.save()
-                    canvas.clipOutPath(shape)
+                    canvas.clipOutPath(clipPath)
                     val layer = LiveDiscover.homeLayer
                     if (layer != null && !layer.isReleased) {
                         canvas.translate(-LiveDiscover.viewport.left.toFloat(), -LiveDiscover.viewport.top.toFloat())
@@ -111,14 +113,13 @@ internal class DiscoverFrame(private val activity: Activity, private val vertica
                     return
                 }
                 val insets = rootWindowInsets?.getInsets(WindowInsets.Type.systemBars())
-                val path = Path().apply {
-                    if (DiscoverBounds.available) addRoundRect(0f, 0f, width.toFloat(), height.toFloat(), 16*d, 16*d, Path.Direction.CW)
-                    else addRoundRect(2*d, (insets?.top ?: 0) + 12*d, width - 2*d,
+                clipPath.rewind()
+                if (DiscoverBounds.available) clipPath.addRoundRect(0f, 0f, width.toFloat(), height.toFloat(), 16*d, 16*d, Path.Direction.CW)
+                else clipPath.addRoundRect(2*d, (insets?.top ?: 0) + 12*d, width - 2*d,
                         height - (insets?.bottom ?: 0) - 12*d, 26*d, 26*d, Path.Direction.CW)
-                }
-                path.offset(-(1f - DiscoverMotion.progress.floatValue) * width, 0f)
+                clipPath.offset(-(1f - DiscoverMotion.progress.floatValue) * width, 0f)
                 val saved = canvas.save()
-                canvas.clipOutPath(path)
+                canvas.clipOutPath(clipPath)
                 canvas.translate(-origin.x, -origin.y)
                 painter.draw(Density(d), LayoutDirection.Ltr, androidx.compose.ui.graphics.Canvas(canvas),
                     if (fullSize == Size.Zero) Size(width.toFloat(), height.toFloat()) else fullSize) {
@@ -127,7 +128,7 @@ internal class DiscoverFrame(private val activity: Activity, private val vertica
                 if (DiscoverBounds.available) canvas.drawColor(
                     if (DuoAppearanceRuntime.dark) 0xeb263a43.toInt() else 0xebe8eff2.toInt())
                 canvas.restoreToCount(saved)
-                canvas.drawPath(path, border)
+                canvas.drawPath(clipPath, border)
                 if (coverAlpha > 0f) {
                     cover.color = if (DuoAppearanceRuntime.dark) 0xff263a43.toInt() else 0xffe8eff2.toInt()
                     cover.alpha = (coverAlpha * 255).toInt()

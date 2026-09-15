@@ -69,7 +69,10 @@ class LiveDiscoverIntegrationTest {
         var bounds: android.graphics.Rect? = null
         var stableSince = 0L
         await {
-            val candidate = node(description)?.takeIf { it.isVisibleToUser && it.isEnabled }
+            // The transparent, focusable token host prevents Android's accessibility
+            // occlusion calculation from marking the exposed Home node visible. Its window
+            // is non-touchable, so the node's screen bounds remain the real input target.
+            val candidate = node(description)?.takeIf { it.isEnabled }
                 ?.let { android.graphics.Rect().also(it::getBoundsInScreen) }?.takeUnless { it.isEmpty }
             if (candidate != bounds) { bounds = candidate; stableSince = SystemClock.uptimeMillis() }
             candidate != null && SystemClock.uptimeMillis() - stableSince >= 250
@@ -81,9 +84,11 @@ class LiveDiscoverIntegrationTest {
     @Test fun liveFeedTracksHeldEntryExitAndReversalWithoutReplacingHost() {
         check(android.os.Build.HARDWARE in listOf("ranchu", "goldfish")) { "Native gesture test runs only on an emulator" }
         LiveDiscover.attachNativeFeed = true
-        val previousHome = shell("cmd role get-role-holders android.app.role.HOME").lineSequence().firstOrNull().orEmpty()
-        shell("cmd role add-role-holder android.app.role.HOME com.jake.duolauncher 0")
         val context = instrumentation.targetContext
+        val launcherPackage = context.packageName
+        val previousHome = shell("cmd role get-role-holders android.app.role.HOME").lineSequence().firstOrNull().orEmpty()
+        shell("cmd role add-role-holder android.app.role.HOME $launcherPackage 0")
+        SetupExperience(context).finish()
         context.startActivity(android.content.Intent(context, MainActivity::class.java).addFlags(android.content.Intent.FLAG_ACTIVITY_NEW_TASK))
         try {
             await { LiveDiscover.owner.get() != null }
@@ -219,7 +224,7 @@ class LiveDiscoverIntegrationTest {
         } finally {
             // A Home task can be recreated while an external search activity returns.
             // Follow the live owner instead of treating it as a fixed ActivityScenario.
-            val cleanupHome = previousHome.takeIf { it.isNotEmpty() && it != "com.jake.duolauncher" }
+            val cleanupHome = previousHome.takeIf { it.isNotEmpty() && it != launcherPackage }
                 ?: "com.google.android.apps.nexuslauncher"
             shell("cmd role add-role-holder android.app.role.HOME $cleanupHome 0")
             try {

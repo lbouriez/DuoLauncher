@@ -69,6 +69,9 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.platform.LocalWindowInfo
+import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.ui.focus.focusRequester
+import androidx.compose.ui.platform.LocalSoftwareKeyboardController
 import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.semantics.Role
@@ -125,6 +128,7 @@ fun LauncherScreen(
     onLaunch: (AppEntry) -> Unit, onMakeDefault: () -> Unit, onAppInfo: (AppEntry) -> Unit,
     isDefaultHome: Boolean, deviceStatus: DeviceStatus, onStatusMode: (Boolean) -> Unit, onWallpaperPreview: () -> Unit,
     onDiscover: () -> Unit = {}, searchRequests: Int = 0,
+    onChooseDock: (Int) -> Unit = {},
     onLaunchFrom: (AppEntry, android.graphics.Rect?) -> Unit = { app, _ -> onLaunch(app) },
     onGoogleSearch: (android.graphics.Rect?) -> Boolean = { false },
     appearance: AppearanceState = AppearanceState(),
@@ -137,7 +141,6 @@ fun LauncherScreen(
     onShadeSetup: () -> Unit = {},
 ) {
     var sheet by rememberSaveable { mutableStateOf("") }
-    var dockSlot by rememberSaveable { mutableIntStateOf(0) }
     var widgetSlot by rememberSaveable { mutableIntStateOf(0) }
     var widgetTargetIndex by rememberSaveable { mutableIntStateOf(Int.MIN_VALUE) }
     var widgetExactTarget by rememberSaveable { mutableStateOf(false) }
@@ -384,7 +387,7 @@ fun LauncherScreen(
             withFrameNanos { }
             pager.scrollToPage(if (returnToLibrary) model.state.value.homePages else page.coerceIn(0, model.state.value.homePages - 1))
             if (!moved && !cancelled) {
-                if (source.target is DropTarget.Dock) { dockSlot = source.target.index; sheet = "dock" }
+                if (source.target is DropTarget.Dock) onChooseDock(source.target.index)
                 else if (source.target is DropTarget.Widget) { widgetSlot = source.target.index; sheet = "widgetActions" }
                 else if (source.appId?.let(::isFolderId) == true) openFolderId = source.appId
                 else if (source.folderId == null) selectedId = source.appId
@@ -584,7 +587,7 @@ fun LauncherScreen(
                 Column(Modifier.padding(vertical = 8.dp).verticalScroll(dockScroll)) {
                     DockAppColumn(state.dock, previewLayout.dock, appsById, geometry.dockRowHeight,
                         dockIconSize(geometry.iconSize), drag, insertionTarget,
-                        onLaunch = onLaunchFrom, onChoose = { dockSlot = it; sheet = "dock" })
+                        onLaunch = onLaunchFrom, onChoose = onChooseDock)
                 }
             }
             Column(Modifier.align(Alignment.BottomStart).width(pagerWidth).padding(start = 16.dp, bottom = 6.dp), horizontalAlignment = Alignment.CenterHorizontally) {
@@ -638,16 +641,6 @@ fun LauncherScreen(
                         }
                     }
                     when (sheet) {
-                        "dock" -> AppPicker(state.apps, dockSlot,
-                            onSelect = {
-                                if (canPlaceInDock(state.layout, it.id)) {
-                                    model.applyDrop(it.id, DropTarget.Dock(dockSlot)); sheet = ""
-                                }
-                            },
-                            onClear = { model.removePlacement(DropTarget.Dock(dockSlot)) },
-                            onLongClick = { selectedId = it.id; sheet = "" },
-                            canSelect = { canPlaceInDock(state.layout, it.id) },
-                            blockedHint = if (state.dock.none { it == null }) "Dock full • Move an app out first" else null)
                         "pins" -> Column(Modifier.fillMaxHeight(.9f).imePadding()) {
                             Row(Modifier.fillMaxWidth().padding(horizontal = 20.dp), horizontalArrangement = Arrangement.End) {
                                 TextButton(onClick = { sheet = "" }) { Text("Done") }
@@ -1816,13 +1809,25 @@ private fun MovableWidget(id: Int, slot: Int, controller: WidgetController, drag
 }
 
 @Composable
-private fun AppPicker(apps: List<AppEntry>, dockSlot: Int?, onSelect: (AppEntry) -> Unit, onClear: () -> Unit,
-    onLongClick: (AppEntry) -> Unit, canSelect: (AppEntry) -> Boolean = { true }, blockedHint: String? = null) {
+internal fun AppPicker(apps: List<AppEntry>, dockSlot: Int?, onSelect: (AppEntry) -> Unit, onClear: () -> Unit,
+    onLongClick: (AppEntry) -> Unit, canSelect: (AppEntry) -> Boolean = { true }, blockedHint: String? = null,
+    heightFraction: Float = .88f, requestSearchFocus: Boolean = false) {
     var query by rememberSaveable { mutableStateOf("") }
+    val searchFocus = remember { FocusRequester() }
+    val keyboard = LocalSoftwareKeyboardController.current
+    LaunchedEffect(requestSearchFocus) {
+        if (requestSearchFocus) {
+            // Let the sheet attach before binding the IME to its editor.
+            delay(300)
+            searchFocus.requestFocus()
+            keyboard?.show()
+        }
+    }
     val filtered = remember(apps, query) { apps.filter { it.label.contains(query.trim(), ignoreCase = true) } }
-    Column(Modifier.fillMaxWidth().fillMaxHeight(.88f).padding(horizontal = 20.dp).imePadding()) {
+    Column(Modifier.fillMaxWidth().fillMaxHeight(heightFraction).padding(horizontal = 20.dp).imePadding()) {
         Text(if (dockSlot == null) "Your apps" else "Dock position ${dockSlot + 1}", style = MaterialTheme.typography.headlineSmall)
-        OutlinedTextField(query, { query = it }, Modifier.fillMaxWidth().padding(vertical = 16.dp).testTag("search-field"),
+        OutlinedTextField(query, { query = it }, Modifier.fillMaxWidth().padding(vertical = 16.dp)
+            .focusRequester(searchFocus).testTag("search-field"),
             placeholder = { Text("Search apps") }, leadingIcon = { Icon(Icons.Rounded.Search, null) }, singleLine = true,
             trailingIcon = { if (query.isNotEmpty()) IconButton(onClick = { query = "" }) { Icon(Icons.Rounded.Close, "Clear search") } }, shape = RoundedCornerShape(20.dp))
         if (dockSlot != null) TextButton(onClick = onClear) { Text("Leave this position empty") }

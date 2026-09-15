@@ -27,16 +27,22 @@ internal object DiscoverMotion {
         val bitmap = Bitmap.createBitmap(decor.width, decor.height, Bitmap.Config.ARGB_8888)
         val handler = Handler(Looper.getMainLooper())
         var completed = false
-        fun complete(result: Int) {
-            if (completed || attempt != captureGeneration) return
+        fun complete(result: Int, pixelCopyFinished: Boolean) {
+            if (completed || attempt != captureGeneration) {
+                // PixelCopy owns the destination until its callback. Once it has finished,
+                // an unpublished result is safe to release even if this capture went stale.
+                if (pixelCopyFinished && bitmap !== home && !bitmap.isRecycled) bitmap.recycle()
+                return
+            }
             completed = true
             if (result == PixelCopy.SUCCESS) home = bitmap
+            else if (pixelCopyFinished && !bitmap.isRecycled) bitmap.recycle()
             if (!activity.isFinishing && !activity.isDestroyed) ready()
         }
-        try { PixelCopy.request(activity.window, bitmap, { complete(it) }, handler) }
-        catch (_: IllegalArgumentException) { complete(PixelCopy.ERROR_SOURCE_INVALID) }
+        try { PixelCopy.request(activity.window, bitmap, { complete(it, true) }, handler) }
+        catch (_: IllegalArgumentException) { complete(PixelCopy.ERROR_SOURCE_INVALID, true) }
         // A missed copy must never prevent navigation. The image is optional.
-        handler.postDelayed({ complete(PixelCopy.ERROR_TIMEOUT) }, 150)
+        handler.postDelayed({ complete(PixelCopy.ERROR_TIMEOUT, false) }, 150)
     }
 
     fun reset() { captureGeneration++; home = null; pageWidth = 0f; progress.floatValue = 1f }

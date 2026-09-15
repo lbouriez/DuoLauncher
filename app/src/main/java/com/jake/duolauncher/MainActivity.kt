@@ -63,6 +63,10 @@ class MainActivity : ComponentActivity() {
     private var returningFromShadeSettings = false
     private var shadeSetupOwnsExternalUi = false
     private var recreatingShadeSetup = false
+    private var returningFromGoogleSearch = false
+    private var googleSearchOwnsExternalUi = false
+    private var returningFromDockPicker = false
+    private var dockPickerOwnsExternalUi = false
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -70,6 +74,8 @@ class MainActivity : ComponentActivity() {
         showFirstRun.value = setupExperience.entryDecision(SetupExperience.hadLauncherState(this)) ==
             SetupEntryDecision.SHOW
         returningFromShadeSettings = savedInstanceState?.getBoolean(SHADE_SETTINGS_PENDING) == true
+        returningFromGoogleSearch = savedInstanceState?.getBoolean(GOOGLE_SEARCH_PENDING) == true
+        returningFromDockPicker = savedInstanceState?.getBoolean(DOCK_PICKER_PENDING) == true
         val restoreShadeDialog = savedInstanceState?.getBoolean(SHADE_DIALOG_VISIBLE) == true
         appearance = AppearanceStore(this)
         enableEdgeToEdge(statusBarStyle = SystemBarStyle.dark(android.graphics.Color.TRANSPARENT),
@@ -95,6 +101,7 @@ class MainActivity : ComponentActivity() {
                     onLaunch = { launchApp(it) }, onMakeDefault = ::makeDefault, onAppInfo = ::appInfo,
                     isDefaultHome = defaultHome.value, deviceStatus = deviceStatus, onStatusMode = ::setStatusMode, onWallpaperPreview = ::previewWallpaper,
                     onDiscover = ::openDiscover, searchRequests = searchRequests.intValue,
+                    onChooseDock = ::chooseDockApp,
                     onLaunchFrom = ::launchApp, onGoogleSearch = ::openGoogleSearch,
                     appearance = appearance.state,
                     onAppearanceMode = { cancelAppearanceLocation(); appearance.setMode(it, systemDark()) },
@@ -110,6 +117,8 @@ class MainActivity : ComponentActivity() {
         // Reassert the token after recreation (and after process restoration, where the
         // in-memory owner set is empty) before any external UI can uncover Discover.
         if (returningFromShadeSettings || restoreShadeDialog) ownShadeSetupExternally()
+        if (returningFromGoogleSearch) ownGoogleSearchExternally()
+        if (returningFromDockPicker) ownDockPickerExternally()
         if (restoreShadeDialog) window.decorView.post { if (!isFinishing && !isDestroyed) showShadeSetup() }
     }
 
@@ -132,6 +141,8 @@ class MainActivity : ComponentActivity() {
         recreatingShadeSetup = isChangingConfigurations
         shadeSetupDialog?.dismiss()
         if (!isChangingConfigurations) releaseShadeSetupOwnership()
+        if (!isChangingConfigurations) releaseGoogleSearchOwnership()
+        if (!isChangingConfigurations) releaseDockPickerOwnership()
         cancelAppearanceLocation()
         super.onDestroy()
     }
@@ -140,6 +151,14 @@ class MainActivity : ComponentActivity() {
         if (returningFromShadeSettings) {
             returningFromShadeSettings = false
             releaseShadeSetupOwnership()
+        }
+        if (returningFromGoogleSearch) {
+            returningFromGoogleSearch = false
+            releaseGoogleSearchOwnership()
+        }
+        if (returningFromDockPicker) {
+            returningFromDockPicker = false
+            releaseDockPickerOwnership()
         }
         val discover = DiscoverSession.host.get()
         if (discover != null) window.decorView.doOnPreDraw {
@@ -203,6 +222,18 @@ class MainActivity : ComponentActivity() {
         shadeSetupOwnsExternalUi = false
         LiveDiscover.setExternalResultPending(this, "main", "shade-service-setup", false)
     }
+
+    private fun ownGoogleSearchExternally() {
+        if (googleSearchOwnsExternalUi) return
+        googleSearchOwnsExternalUi = true
+        LiveDiscover.setExternalResultPending(this, "main", "google-search", true)
+    }
+
+    private fun releaseGoogleSearchOwnership() {
+        if (!googleSearchOwnsExternalUi) return
+        googleSearchOwnsExternalUi = false
+        LiveDiscover.setExternalResultPending(this, "main", "google-search", false)
+    }
     override fun onWindowFocusChanged(hasFocus: Boolean) {
         super.onWindowFocusChanged(hasFocus)
         if (hasFocus) setStatusMode(model.state.value.verticalStatus)
@@ -211,6 +242,8 @@ class MainActivity : ComponentActivity() {
         widgets.save(outState)
         outState.putBoolean(SHADE_DIALOG_VISIBLE, shadeSetupDialog?.isShowing == true && !returningFromShadeSettings)
         outState.putBoolean(SHADE_SETTINGS_PENDING, returningFromShadeSettings)
+        outState.putBoolean(GOOGLE_SEARCH_PENDING, returningFromGoogleSearch)
+        outState.putBoolean(DOCK_PICKER_PENDING, returningFromDockPicker)
         super.onSaveInstanceState(outState)
     }
     override fun onNewIntent(intent: Intent) {
@@ -242,14 +275,58 @@ class MainActivity : ComponentActivity() {
     private fun launchOptions(bounds: android.graphics.Rect?): Bundle? = bounds?.takeUnless { it.isEmpty }?.let {
         android.app.ActivityOptions.makeScaleUpAnimation(window.decorView, it.left, it.top, it.width(), it.height()).toBundle()
     }
-    private fun openGoogleSearch(bounds: android.graphics.Rect?): Boolean = try {
-        startActivity(googleSearchIntent().apply { sourceBounds = screenBounds(bounds) }, launchOptions(bounds))
-        true
-    } catch (_: android.content.ActivityNotFoundException) { false }
-      catch (_: SecurityException) { false }
+    private fun openGoogleSearch(bounds: android.graphics.Rect?): Boolean {
+        ownGoogleSearchExternally()
+        returningFromGoogleSearch = true
+        return try {
+            startActivity(googleSearchIntent().apply { sourceBounds = screenBounds(bounds) }, launchOptions(bounds))
+            true
+        } catch (_: android.content.ActivityNotFoundException) {
+            returningFromGoogleSearch = false
+            releaseGoogleSearchOwnership()
+            false
+        } catch (_: SecurityException) {
+            returningFromGoogleSearch = false
+            releaseGoogleSearchOwnership()
+            false
+        }
+    }
+
+    private fun chooseDockApp(slot: Int) {
+        ownDockPickerExternally()
+        returningFromDockPicker = true
+        val intent = Intent(this, DockAppPickerActivity::class.java)
+            .putExtra(DockAppPickerActivity.EXTRA_SLOT, slot)
+            .addFlags(Intent.FLAG_ACTIVITY_NO_ANIMATION)
+        try {
+            startActivity(intent)
+        } catch (_: android.content.ActivityNotFoundException) {
+            returningFromDockPicker = false
+            releaseDockPickerOwnership()
+        }
+    }
+
+    private fun ownDockPickerExternally() {
+        if (dockPickerOwnsExternalUi) return
+        dockPickerOwnsExternalUi = true
+        LiveDiscover.setExternalResultPending(this, "main", "dock-picker", true)
+    }
+
+    private fun releaseDockPickerOwnership() {
+        if (!dockPickerOwnsExternalUi) return
+        dockPickerOwnsExternalUi = false
+        LiveDiscover.setExternalResultPending(this, "main", "dock-picker", false)
+    }
+
+    internal fun applyDockPickerSelection(slot: Int, appId: String?) {
+        if (slot !in model.state.value.dock.indices) return
+        if (appId == null) model.removePlacement(DropTarget.Dock(slot))
+        else if (canPlaceInDock(model.state.value.layout, appId))
+            model.applyDrop(appId, DropTarget.Dock(slot))
+    }
 
     private fun openDiscover() {
-        if (DiscoverEmbedding.supported(this)) {
+        if (DiscoverEmbedding.supported(this) && DiscoverClient.isAvailable(this)) {
             if (openingDiscover) return
             openingDiscover = true
             // A very quick reopen can arrive before the previous return's deferred cleanup.
@@ -388,5 +465,7 @@ class MainActivity : ComponentActivity() {
     private companion object {
         const val SHADE_DIALOG_VISIBLE = "duo.shade.dialog_visible"
         const val SHADE_SETTINGS_PENDING = "duo.shade.settings_pending"
+        const val GOOGLE_SEARCH_PENDING = "duo.google.search_pending"
+        const val DOCK_PICKER_PENDING = "duo.dock.picker_pending"
     }
 }

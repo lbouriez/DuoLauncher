@@ -16,4 +16,7 @@
         <item name="android:backgroundDimEnabled">false</item>
         <item name="android:windowAnimationStyle">@null</item>
     </style>
+    <style name="Theme.Duo.Picker" parent="Theme.Duo.LiveDiscover">
+        <item name="android:windowSoftInputMode">adjustResize</item>
+    </style>
 </resources>

@@ -13,7 +13,8 @@
     </queries>
     <application android:label="Duo Launcher" android:icon="@drawable/ic_launcher"
         android:name=".DuoApplication"
-        android:theme="@style/Theme.Duo" android:allowBackup="false" android:supportsRtl="true">
+        android:theme="@style/Theme.Duo" android:allowBackup="false"
+        android:dataExtractionRules="@xml/data_extraction_rules" android:supportsRtl="true">
         <property android:name="android.window.PROPERTY_ACTIVITY_EMBEDDING_SPLITS_ENABLED" android:value="true" />
         <property android:name="android.window.PROPERTY_ACTIVITY_EMBEDDING_ALLOW_SYSTEM_OVERRIDE" android:value="false" />
         <activity android:name=".DiscoverActivity" android:exported="false"
@@ -23,6 +24,8 @@
         <activity android:name=".DiscoverFeedActivity" android:theme="@style/Theme.Duo.Discover" android:exported="false" android:resizeableActivity="true" />
         <activity android:name=".LiveDiscoverActivity" android:theme="@style/Theme.Duo.LiveDiscover"
             android:exported="false" android:resizeableActivity="true" />
+        <activity android:name=".DockAppPickerActivity" android:theme="@style/Theme.Duo.Picker"
+            android:exported="false" android:excludeFromRecents="true" />
         <service android:name=".DuneWallpaperService" android:label="Duo dunes"
             android:permission="android.permission.BIND_WALLPAPER" android:exported="true">
             <intent-filter><action android:name="android.service.wallpaper.WallpaperService" /></intent-filter>

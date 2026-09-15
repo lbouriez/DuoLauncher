@@ -84,6 +84,10 @@ internal object LiveDiscover {
         if (!attachNativeFeed || externalResultOwners.isNotEmpty() || !DiscoverBounds.available || bounds.isEmpty ||
             activity.isFinishing || activity.isDestroyed ||
             !activity.lifecycle.currentState.isAtLeast(androidx.lifecycle.Lifecycle.State.STARTED)) return
+        if (!DiscoverClient.isAvailable(activity)) {
+            message.value = "The installed Google app doesn't provide a compatible Discover feed."
+            return
+        }
         pageWidth = width
         viewport = Rect(bounds)
         DiscoverBounds.updateViewport(activity, bounds)
@@ -169,8 +173,13 @@ internal object LiveDiscover {
     fun attached(activity: LiveDiscoverActivity): Boolean {
         if (!startGate.attached(activity.intent.getLongExtra(HOST_START_TOKEN, Long.MIN_VALUE))) return false
         host = WeakReference(activity)
-        if (externalResultOwners.isNotEmpty()) { host.clear(); activity.finish() }
+        if (externalResultOwners.isNotEmpty()) finishHost(activity)
         return true
+    }
+
+    private fun finishHost(activity: LiveDiscoverActivity) {
+        host.clear()
+        activity.finish()
     }
     fun detached(activity: LiveDiscoverActivity) {
         if (host.get() !== activity) return
@@ -196,8 +205,7 @@ internal object LiveDiscover {
             externalResultOwners.add(key)
             startGate.reset()
             val current = host.get()
-            host.clear()
-            current?.finish()
+            if (current != null) finishHost(current) else host.clear()
         } else {
             externalResultOwners.remove(key)
             if (externalResultOwners.isEmpty()) activity.window.decorView.post {
@@ -229,7 +237,10 @@ class LiveDiscoverActivity : ComponentActivity() {
         if (!LiveDiscover.attached(this) || isFinishing) { finish(); return }
         enableEdgeToEdge()
         window.setWindowAnimations(0)
-        window.addFlags(WindowManager.LayoutParams.FLAG_NOT_TOUCHABLE or WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE)
+        // The host must remain focusable so Android always has a focused window for this
+        // resumed activity. Touches still pass through to Home; Google's child window is
+        // independently touchable and non-focusable while the pager owns the gesture.
+        window.addFlags(WindowManager.LayoutParams.FLAG_NOT_TOUCHABLE)
         vertical = org.json.JSONObject(getSharedPreferences("launcher", 0).getString("state", "{}") ?: "{}").optBoolean("verticalStatus", true)
         if (vertical) WindowCompat.getInsetsController(window, window.decorView).hide(WindowInsetsCompat.Type.statusBars())
         setContentView(View(this))

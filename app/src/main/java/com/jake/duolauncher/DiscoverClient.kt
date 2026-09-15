@@ -132,8 +132,11 @@ internal class DiscoverClient(
             override fun onNullBinding(name: ComponentName) { failed("The Google app did not provide a feed.", attempt) }
             override fun onBindingDied(name: ComponentName) { failed("Discover disconnected. Tap Retry to reconnect.", attempt) }
         }
-        val intent = Intent("com.android.launcher3.WINDOW_OVERLAY").setPackage(GOOGLE_PACKAGE)
-            .setData(Uri.parse("app://${activity.packageName}:${Process.myUid()}?v=5"))
+        val intent = overlayIntent(activity)
+        if (intent == null) {
+            onState("The installed Google app doesn't provide a compatible Discover feed.")
+            return
+        }
         try {
             if (activity.bindService(intent, binding, Context.BIND_AUTO_CREATE)) connection = binding
             else onState("Install or enable the Google app to use Discover.")
@@ -259,8 +262,22 @@ internal class DiscoverClient(
 
     companion object {
         const val GOOGLE_PACKAGE = "com.google.android.googlequicksearchbox"
+        private const val OVERLAY_ACTION = "com.android.launcher3.WINDOW_OVERLAY"
         private const val TAG = "DuoDiscover"
         private const val OVERLAY = "com.google.android.libraries.launcherclient.ILauncherOverlay"
         private const val CALLBACK = "com.google.android.libraries.launcherclient.ILauncherOverlayCallback"
+
+        @Suppress("DEPRECATION")
+        private fun overlayIntent(context: Context): Intent? {
+            // Google's service filter requires the app:// scheme, so resolve the exact
+            // protocol-shaped intent rather than checking the action by itself.
+            val query = Intent(OVERLAY_ACTION).setPackage(GOOGLE_PACKAGE)
+                .setData(Uri.parse("app://${context.packageName}:${Process.myUid()}?v=5"))
+            val service = context.packageManager.resolveService(query, 0)?.serviceInfo ?: return null
+            if (!service.enabled || !service.exported || service.packageName != GOOGLE_PACKAGE) return null
+            return query.setComponent(ComponentName(service.packageName, service.name))
+        }
+
+        fun isAvailable(context: Context): Boolean = overlayIntent(context) != null
     }
 }
