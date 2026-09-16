@@ -73,6 +73,22 @@ class LayoutModelTest {
         assertTrue(homeGeometry(933f, 650f, LayoutPreset(), true).expanded)
         assertTrue(homeGeometry(933f, 650f, LayoutPreset(), true).homeWidth <= 460f)
     }
+    @Test fun `Fold cover geometry uses available height without affecting ordinary compact layouts`() {
+        val cover = homeGeometry(475f, 900f, LayoutPreset(), true)
+        val ordinary = homeGeometry(475f, 700f, LayoutPreset(), true)
+
+        assertTrue(isTallCompactViewport(475f, 900f))
+        assertFalse(isTallCompactViewport(475f, 700f))
+        assertTrue(cover.contentTop > 72f)
+        assertTrue(ordinary.contentTop <= 72f)
+        assertTrue(cover.contentTop > ordinary.contentTop)
+        assertTrue(cover.dockTop + cover.dockHeight <= 900f - 124f + .01f)
+    }
+    @Test fun `app library grid remains single column until the dock safe viewport is wide`() {
+        assertEquals(1, appLibraryColumnCount(679f))
+        assertEquals(2, appLibraryColumnCount(680f))
+        assertEquals(2, appLibraryColumnCount(900f))
+    }
     @Test fun `raising dock cannot overlap measured status or lower controls`() {
         for ((height, status) in listOf(700f to 124f, 650f to 124f, 280f to 80f)) {
             for (position in listOf(.25f, .56f, .75f)) {

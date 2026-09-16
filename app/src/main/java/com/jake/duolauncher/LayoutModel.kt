@@ -3,6 +3,16 @@ package com.jake.duolauncher
 /** Jake's reference measures 76px dock artwork against 106px home artwork. */
 fun dockIconSize(homeIconSize: Float) = homeIconSize * (76f / 106f)
 
+/**
+ * The Fold cover display is unusually tall. Let its workspace settle a little lower so the
+ * widget, grid, and dock read as one balanced column, while keeping ordinary phones and the
+ * unfolded workspace on their existing tuned geometry.
+ */
+fun isTallCompactViewport(width: Float, height: Float) = width > 0f && width < 650f && height / width >= 1.75f
+
+/** Two columns are reserved for the wide, dock-safe app-library viewport, never the cover screen. */
+fun appLibraryColumnCount(viewportWidth: Float) = if (viewportWidth >= 680f) 2 else 1
+
 data class LayoutPreset(
     val iconSize: Float = 66f,
     val rowGap: Float = 8f,
@@ -51,7 +61,8 @@ fun homeGeometry(width: Float, height: Float, preset: LayoutPreset, labels: Bool
     // Keep the same icon rhythm when labels are hidden; allow larger system text to fit.
     val row = maxOf(48f, icon + if (labels) maxOf(20f, labelHeight) else 20f) + p.rowGap
     val widget = minOf(176f, gridWidth / 2f - 5f).coerceAtLeast(88f)
-    val contentTop = ((height - widget - 18f - 4f * row - homeBottomSpace) / 2f).coerceIn(16f, 72f)
+    val maxContentTop = if (isTallCompactViewport(width, height)) 112f else 72f
+    val contentTop = ((height - widget - 18f - 4f * row - homeBottomSpace) / 2f).coerceIn(16f, maxContentTop)
     // Search reclaims the redundant bottom controls' space for all four dock apps.
     // Extremely short windows still scroll rather than reduce touch targets below 48dp.
     val topLimit = maxOf(8f, statusHeight)

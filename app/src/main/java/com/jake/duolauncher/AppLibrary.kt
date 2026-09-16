@@ -47,6 +47,7 @@ internal fun AppLibrary(
     onLaunchFrom: (AppEntry, android.graphics.Rect?) -> Unit = { app, _ -> onLaunch(app) },
     onTurnOnWork: (Long) -> Unit = {},
     requestSearchFocus: Boolean = false,
+    columnCount: Int = 1,
 ) {
     val glass = !editing
     val palette = LocalDuoPalette.current
@@ -94,6 +95,7 @@ internal fun AppLibrary(
             it.label.firstOrNull()?.takeIf(Char::isLetter)?.uppercaseChar()?.toString() ?: "#"
         }
     }
+    val columns = columnCount.coerceIn(1, 2)
     Surface(modifier, shape = RoundedCornerShape(24.dp),
         color = if (glass) Glass.copy(alpha = .48f) else MaterialTheme.colorScheme.surface,
         contentColor = ink,
@@ -146,28 +148,49 @@ internal fun AppLibrary(
                             if (glass) HorizontalDivider(Modifier.weight(1f).padding(start = 10.dp), color = Color.White.copy(alpha = .24f))
                         }
                     }
-                    items(entries, key = { it.id }) { app ->
-                        val isPinned = app.id in pinned
-                        val launchBounds = remember { android.graphics.Rect() }
-                        val dragModifier = if (drag != null) Modifier.dropRegion(drag, DropTarget.Library(app.id), app.id, page) else Modifier
-                        val click = { if (editing) onPin(app.id, !isPinned) else onLaunchFrom(app, launchBounds) }
-                        Row(Modifier.fillMaxWidth().heightIn(min = 60.dp).then(dragModifier).clip(RoundedCornerShape(14.dp)).testTag("library-app-${app.id}")
-                            .then(if (drag == null) Modifier.combinedClickable(onClick = click, onLongClick = { onActions(app) })
-                                else Modifier.clickable(onClick = click).semantics { onLongClick("App options") { onActions(app); true } })
-                            .padding(vertical = 6.dp), verticalAlignment = Alignment.CenterVertically) {
-                            Image(app.icon.asImageBitmap(), null, Modifier.size(40.dp)
-                                .onGloballyPositioned { launchBounds.set(it.boundsInWindow().toAndroidBounds()) }.clip(RoundedCornerShape(10.dp)))
-                            Text(app.label, Modifier.weight(1f).padding(start = 12.dp), maxLines = 2, fontSize = 14.sp)
-                            if (editing) IconButton(onClick = { onPin(app.id, !isPinned) }, Modifier.testTag("pin-${app.id}")) {
-                                Icon(if (isPinned) Icons.Rounded.PushPin else Icons.Outlined.PushPin,
-                                    if (isPinned) "Remove ${app.label} from home" else "Pin ${app.label} to home",
-                                    tint = if (isPinned) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.outline,
-                                    modifier = Modifier.size(20.dp))
+                    items(entries.chunked(columns), key = { row -> row.joinToString("|") { it.id } }) { row ->
+                        Row(Modifier.fillMaxWidth()) {
+                            row.forEach { app ->
+                                LibraryAppItem(app, app.id in pinned, editing, drag, page, onLaunchFrom, onPin, onActions,
+                                    Modifier.weight(1f))
                             }
+                            repeat(columns - row.size) { Spacer(Modifier.weight(1f)) }
                         }
                     }
                 }
             }
+        }
+    }
+}
+
+/** A row cell remains the same accessible target in one- and two-column library layouts. */
+@Composable
+private fun LibraryAppItem(
+    app: AppEntry,
+    isPinned: Boolean,
+    editing: Boolean,
+    drag: HomeDragState?,
+    page: Int?,
+    onLaunchFrom: (AppEntry, android.graphics.Rect?) -> Unit,
+    onPin: (String, Boolean) -> Unit,
+    onActions: (AppEntry) -> Unit,
+    modifier: Modifier,
+) {
+    val launchBounds = remember { android.graphics.Rect() }
+    val dragModifier = if (drag != null) Modifier.dropRegion(drag, DropTarget.Library(app.id), app.id, page) else Modifier
+    val click = { if (editing) onPin(app.id, !isPinned) else onLaunchFrom(app, launchBounds) }
+    Row(modifier.heightIn(min = 60.dp).then(dragModifier).clip(RoundedCornerShape(14.dp)).testTag("library-app-${app.id}")
+        .then(if (drag == null) Modifier.combinedClickable(onClick = click, onLongClick = { onActions(app) })
+            else Modifier.clickable(onClick = click).semantics { onLongClick("App options") { onActions(app); true } })
+        .padding(vertical = 6.dp), verticalAlignment = Alignment.CenterVertically) {
+        Image(app.icon.asImageBitmap(), null, Modifier.size(40.dp)
+            .onGloballyPositioned { launchBounds.set(it.boundsInWindow().toAndroidBounds()) }.clip(RoundedCornerShape(10.dp)))
+        Text(app.label, Modifier.weight(1f).padding(start = 12.dp, end = 6.dp), maxLines = 2, fontSize = 14.sp)
+        if (editing) IconButton(onClick = { onPin(app.id, !isPinned) }, Modifier.testTag("pin-${app.id}")) {
+            Icon(if (isPinned) Icons.Rounded.PushPin else Icons.Outlined.PushPin,
+                if (isPinned) "Remove ${app.label} from home" else "Pin ${app.label} to home",
+                tint = if (isPinned) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.outline,
+                modifier = Modifier.size(20.dp))
         }
     }
 }

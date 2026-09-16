@@ -598,7 +598,8 @@ fun LauncherScreen(
                             onActions = { selectedId = it.id }, modifier = Modifier.width(pagerWidth).fillMaxHeight()
                                 .padding(start = 16.dp, top = 16.dp, bottom = bottomSpace).testTag("library-page"),
                             drag = drag, page = visibleHomePages, onLaunchFrom = onLaunchFrom, onTurnOnWork = { model.turnOnWork(it) },
-                            requestSearchFocus = pager.settledPage == visibleHomePages)
+                            requestSearchFocus = pager.settledPage == visibleHomePages,
+                            columnCount = appLibraryColumnCount(pagerWidth.value))
                     } else {
                         Row(Modifier.fillMaxSize().testTag("home-surface").then(
                             if (state.doubleTapToLock && !drag.active && onLockScreen != null) Modifier.pointerInput(onLockScreen) {
@@ -1376,7 +1377,8 @@ private fun ExpandedWorkspace(
                             .padding(start = 16.dp, top = 16.dp, bottom = bottomSpace)
                             .testTag("library-page"),
                         drag = drag, page = visibleHomePages, onLaunchFrom = onLaunchFrom, onTurnOnWork = onTurnOnWork,
-                        requestSearchFocus = nativePager.settledPage - firstHome == visibleHomePages)
+                        requestSearchFocus = nativePager.settledPage - firstHome == visibleHomePages,
+                        columnCount = appLibraryColumnCount(viewportWidthDp.value))
                 }
             }
         }
