@@ -120,6 +120,27 @@ class WidgetController(
     fun providersForPackage(packageName: String, profile: UserHandle = Process.myUserHandle()): List<AppWidgetProviderInfo> =
         manager.getInstalledProvidersForPackage(packageName, profile)
 
+    fun googleGlanceProvider(): AppWidgetProviderInfo? = personalProviders()
+        .filter { it.provider.packageName == DiscoverClient.GOOGLE_PACKAGE }
+        .filter { it.widgetCategory and AppWidgetProviderInfo.WIDGET_CATEGORY_HOME_SCREEN != 0 }
+        .filter { it.widgetFeatures and AppWidgetProviderInfo.WIDGET_FEATURE_HIDE_FROM_PICKER == 0 }
+        .filter { provider ->
+            provider.provider.className.contains("smartspace", ignoreCase = true) ||
+                provider.loadLabel(activity.packageManager).contains("at a glance", ignoreCase = true)
+        }
+        .sortedBy { provider ->
+            when {
+                provider.provider.className.contains("smartspace", ignoreCase = true) -> 0
+                provider.loadLabel(activity.packageManager).contains("at a glance", ignoreCase = true) -> 1
+                else -> 2
+            }
+        }
+        .firstOrNull()
+
+    fun showFailure(message: String) {
+        failureMessage = message
+    }
+
     fun canReconfigure(id: Int): Boolean {
         val info = manager.getAppWidgetInfo(id) ?: return false
         return id >= 0 && model.state.value.widgetPlacements.any { it.id == id } && info.configure != null &&

@@ -31,7 +31,7 @@ class LayoutBackupIntegrationTest {
             AppProfile(0, "Personal", true, false, false, true, true),
             AppProfile(42, "Work", false, true, false, true, true)),
             homeSlots = listOf(null, null, workId), widgetPlacements = listOf(placement),
-            widgetRestores = listOf(restore), loading = false), emptyList(), "origin-scope")
+            widgetRestores = listOf(restore), googleDiscover = true, loading = false), emptyList(), "origin-scope")
         assertTrue(JSONObject(exported).getBoolean("googleDiscover"))
 
         val same = decodeLayoutBackup(exported, listOf(app), listOf(

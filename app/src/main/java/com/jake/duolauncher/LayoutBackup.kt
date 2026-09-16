@@ -31,7 +31,7 @@ data class LayoutImportPreview(
     val labels: Boolean,
     val googleSearch: Boolean,
     val verticalStatus: Boolean,
-    val googleDiscover: Boolean = true,
+    val googleDiscover: Boolean = false,
 )
 
 fun layoutBackupScope(context: Context): String {
@@ -188,7 +188,7 @@ fun decodeLayoutBackup(raw: String, currentApps: List<AppEntry>, currentProfiles
     val compact = preset("compact"); val expanded = preset("expanded")
     val labels = root.strictBoolean("labels"); val googleSearch = root.strictBoolean("googleSearch")
     val verticalStatus = root.strictBoolean("verticalStatus")
-    val googleDiscover = if (root.has("googleDiscover")) root.strictBoolean("googleDiscover") else true
+    val googleDiscover = if (root.has("googleDiscover")) root.strictBoolean("googleDiscover") else false
     return LayoutImportPreview(layout, missing.toList(), profileIssues.toList(),
         appCount = (slots + leadingSlots).count { it != null && !isReservedFolderId(it) } +
             dock.count { it != null } + folders.sumOf { it.appIds.size },

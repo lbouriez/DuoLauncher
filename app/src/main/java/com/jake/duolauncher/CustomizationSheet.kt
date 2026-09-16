@@ -32,6 +32,7 @@ internal fun CustomizationSheet(state: LauncherState, initiallyWide: Boolean, mo
     onMakeDefault: () -> Unit, onClose: () -> Unit, onEditPins: () -> Unit, onWidget: (Int) -> Unit,
     onAddWidget: (Int) -> Unit, onRemoveWidget: (Int) -> Unit, onWallpaperPreview: () -> Unit,
     onExportLayout: () -> Unit, onImportLayout: () -> Unit, onExportDiagnostics: () -> Unit,
+    onAddGoogleGlance: () -> Unit,
     appearance: AppearanceState, onAppearanceMode: (AppearanceMode) -> Unit,
     onAppearanceManual: (String, Double, Double) -> Unit, onAppearanceDeviceLocation: () -> Unit,
     onAppearanceClear: () -> Unit, backgrounds: LauncherBackgroundController, homePage: Int = 0,
@@ -115,8 +116,18 @@ internal fun CustomizationSheet(state: LauncherState, initiallyWide: Boolean, mo
                 CustomizationPage.GESTURES -> {
                     SettingsSwitch("Show app names", state.labels, model::setLabels, "label-switch")
                     SettingsSwitch("Show status at upper right", state.verticalStatus, model::setVerticalStatus, "status-switch")
-                    SettingsSwitch("Show Google Discover page", state.googleDiscover, model::setGoogleDiscover, "google-discover-switch")
-                    Text("Turn this off if the installed Google app does not provide a compatible launcher feed.",
+                    Text("Google At a Glance", style = MaterialTheme.typography.titleMedium)
+                    Text("Add Google's large At a Glance widget to Duo's left unfolded-screen panel. Android may ask you to approve the widget.",
+                        style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    OutlinedButton(onClick = onAddGoogleGlance, Modifier.fillMaxWidth().heightIn(min = 48.dp)
+                        .testTag("google-glance-add")) {
+                        Icon(Icons.Rounded.Add, null)
+                        Spacer(Modifier.width(8.dp))
+                        Text("Add At a Glance panel")
+                    }
+                    HorizontalDivider(Modifier.padding(vertical = 6.dp))
+                    SettingsSwitch("Experimental native Google Discover", state.googleDiscover, model::setGoogleDiscover, "google-discover-switch")
+                    Text("Google can reject this private launcher integration. Keep it off unless the native feed works on your device.",
                         style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                     SettingsSwitch("Search button opens Google", state.googleSearch, model::setGoogleSearch, "google-search-switch")
                     SettingsSwitch("Double tap empty Home space to lock", state.doubleTapToLock, model::setDoubleTapToLock, "double-tap-lock-switch")

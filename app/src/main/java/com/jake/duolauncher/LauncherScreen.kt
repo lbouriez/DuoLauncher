@@ -710,6 +710,25 @@ fun LauncherScreen(
                             onExportLayout = { sheet = ""; launcherActivity.backups.startExport() },
                             onImportLayout = { sheet = ""; launcherActivity.backups.startImport() },
                             onExportDiagnostics = { sheet = ""; launcherActivity.diagnostics.export() },
+                            onAddGoogleGlance = {
+                                val provider = widgets.googleGlanceProvider()
+                                val placement = widgetCandidate(state.layout, model.nextWidgetSlot(),
+                                    homeCellIndex(-1, 0), GRID_COLUMNS, GRID_ROWS)
+                                when {
+                                    provider == null -> widgets.showFailure(
+                                        "Google's At a Glance widget is unavailable. Install or enable the Google app first.")
+                                    placement == null -> widgets.showFailure(
+                                        "Duo's left unfolded-screen panel is occupied. Remove its widget before adding At a Glance.")
+                                    else -> {
+                                        model.setGoogleDiscover(false)
+                                        val topPitch = (geometry.widgetHeight + 18f) / 2f
+                                        val grid = WidgetGridSizing(GRID_COLUMNS, GRID_ROWS, geometry.gridWidth / GRID_COLUMNS,
+                                            minOf(topPitch, geometry.rowHeight), maxOf(topPitch, geometry.rowHeight), 10f, 18f,
+                                            topRowHeightDp = topPitch, appRowHeightDp = geometry.rowHeight)
+                                        widgets.add(placement, provider, grid)
+                                    }
+                                }
+                            },
                             appearance = appearance, onAppearanceMode = onAppearanceMode,
                             onAppearanceManual = onAppearanceManual, onAppearanceDeviceLocation = onAppearanceDeviceLocation,
                             onAppearanceClear = onAppearanceClear,

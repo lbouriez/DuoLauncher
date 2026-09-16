@@ -16,15 +16,17 @@ Android's [app-signing documentation](https://source.android.com/docs/security/f
 
 Do not uninstall or clear storage from a configured installation just to test a differently signed APK: that removes its layout, selected launcher photo, and Android widget bindings. Keep the configured install and test the other signer on a separate device or disposable emulator. If you deliberately replace the install, save a layout backup first, but expect provider widgets to require **Reconnect** and the launcher photo to be absent from the backup.
 
-## Discover is missing or has no feed
+## Google At a Glance or Discover is missing
 
-Discover requires the installed Google app plus device support for Duo's embedding path. Google account, network, app settings, Android, and vendor updates can affect it.
+For a supported Google information panel, use **Customize launcher → Gestures & search → Add At a Glance panel**. Duo places Google's largest available At a Glance widget in its left unfolded-screen panel. Android may ask you to approve or configure the widget. The widget's available content and maximum size are controlled by the Google app.
 
-- If a recovery card appears, choose **Retry**.
+**Experimental native Google Discover** is disabled by default. It requires the installed Google app plus device support for Google's private launcher-overlay integration. Google account, network, app settings, Android, and vendor updates can affect it.
+
+- If the experimental recovery card appears, choose **Retry**.
 - Choose **Open Google** to check whether the Google app itself can show content.
 - Choose **Back to Home**, press Back, or use the return arrow to leave Discover.
 - If **Open Google** is absent, the Google app has no launchable activity available to Duo.
-- In **Customize launcher → Gestures & search**, turn off **Show Google Discover page** to remove the page, compass button, and swipe gesture when the feed is not usable.
+- In **Customize launcher → Gestures & search**, turn off **Experimental native Google Discover** to remove its page, compass button, and swipe gesture.
 
 To capture connection details, open **Customize launcher → Backup → Export diagnostic log** after reproducing the problem. The bounded text log includes Duo's package/version, whether the APK is debuggable, the signing-certificate fingerprint, device/Android identity, Google app version, and Discover connection events. It does not include your installed-app list or Home layout. Review it before sharing; Duo never uploads it automatically.
 
