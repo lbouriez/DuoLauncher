@@ -6,7 +6,6 @@ import android.graphics.Matrix
 import android.graphics.Paint
 import android.graphics.Path
 import android.graphics.PixelFormat
-import android.animation.ValueAnimator
 import android.view.View
 import android.view.WindowInsets
 import android.view.WindowInsetsController
@@ -28,7 +27,10 @@ internal class DiscoverFrame(private val activity: Activity, private val vertica
     var liveProgress = 0f
         set(value) { field = value; view?.postInvalidateOnAnimation() }
     private var coverAlpha = 1f
-    private var revealAnimator: ValueAnimator? = null
+    // The opaque transition belongs only to the pre-connection fallback. Once Google has
+    // confirmed that its native surface is visible, drawing another coloured layer above the
+    // launcher makes a healthy feed look dimmed and detached from the swipe.
+    private var nativeSurfaceVisible = false
     private var lastTraceBucket = Int.MIN_VALUE
     private val backgroundChanged: () -> Unit = ::invalidate
     var fullSize: Size = Size.Zero
@@ -40,18 +42,13 @@ internal class DiscoverFrame(private val activity: Activity, private val vertica
         // Add after Google's first visible callback: both windows use DRAWN_APPLICATION,
         // so creating the frame during binding would put it underneath the native feed.
         show()
+        nativeSurfaceVisible = true
+        // onVisible is the first trustworthy confirmation from Google's overlay callback.
+        // Do not fade an opaque launcher-coloured cover over a feed that is already visible.
         if (live) { coverAlpha = 0f; return }
-        if (runCatching { android.provider.Settings.Global.getFloat(activity.contentResolver,
-                android.provider.Settings.Global.ANIMATOR_DURATION_SCALE, 1f) == 0f }.getOrDefault(false)) {
-            coverAlpha = 0f; invalidate(); return
-        }
-        if (coverAlpha <= 0f || revealAnimator != null) return
-        revealAnimator = ValueAnimator.ofFloat(coverAlpha, 0f).apply {
-            startDelay = 50
-            duration = 160
-            addUpdateListener { coverAlpha = it.animatedValue as Float; invalidate() }
-            start()
-        }
+        coverAlpha = 0f
+        invalidate()
+        return
     }
 
     fun show() {
@@ -125,11 +122,11 @@ internal class DiscoverFrame(private val activity: Activity, private val vertica
                     if (fullSize == Size.Zero) Size(width.toFloat(), height.toFloat()) else fullSize) {
                         drawLauncherBackground(LauncherBackgroundCache.bitmap?.asImageBitmap(), DuoAppearanceRuntime.dark)
                     }
-                if (DiscoverBounds.available) canvas.drawColor(
+                if (DiscoverBounds.available && !nativeSurfaceVisible) canvas.drawColor(
                     if (DuoAppearanceRuntime.dark) 0xeb263a43.toInt() else 0xebe8eff2.toInt())
                 canvas.restoreToCount(saved)
                 canvas.drawPath(clipPath, border)
-                if (coverAlpha > 0f) {
+                if (coverAlpha > 0f && !nativeSurfaceVisible) {
                     cover.color = if (DuoAppearanceRuntime.dark) 0xff263a43.toInt() else 0xffe8eff2.toInt()
                     cover.alpha = (coverAlpha * 255).toInt()
                     canvas.drawRect(0f, 0f, width.toFloat(), height.toFloat(), cover)
@@ -154,7 +151,7 @@ internal class DiscoverFrame(private val activity: Activity, private val vertica
         }
     }
     fun hide() {
-        revealAnimator?.cancel(); revealAnimator = null; coverAlpha = 1f
+        coverAlpha = 1f; nativeSurfaceVisible = false
         LauncherBackgroundCache.forget(backgroundChanged)
         view?.let { runCatching { manager?.removeViewImmediate(it) } }; view = null; manager = null
     }
